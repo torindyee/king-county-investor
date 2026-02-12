@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { LISTINGS } from "@/app/lib/listings"
-import { Scenario, fmtMoney, fmtPct, underwriting } from "@/app/lib/finance"
+import { LISTINGS } from "../../../lib/listings"
+import { Scenario, fmtMoney, fmtPct, underwriting } from "../../../lib/finance"
 
 const DEFAULT_SCENARIO: Scenario = {
   downPaymentPct: 0.25,
@@ -45,39 +45,47 @@ function SliderRow(props: {
   )
 }
 
-export default function ListingDetailPage({ params }: { params: { id?: string } }) {
-  const rawId = params?.id ?? ""
-  const listingId = Number(rawId)
+function Fact(props: { label: string; value: string; valueClass?: string }) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+      <div className="text-xs font-medium text-zinc-600">{props.label}</div>
+      <div className={`mt-1 text-base font-bold text-zinc-900 ${props.valueClass ?? ""}`}>
+        {props.value}
+      </div>
+    </div>
+  )
+}
+
+export default function ListingDetailPage({ params }: { params: { id: string } }) {
+  const listingId = Number(params.id)
   const listing = LISTINGS.find((l) => l.id === listingId)
 
   const [scenario, setScenario] = useState<Scenario>(DEFAULT_SCENARIO)
-  const [activeImage, setActiveImage] = useState<number>(0)
+  const [activeImage, setActiveImage] = useState(0)
 
   const results = useMemo(() => {
     if (!listing) return null
-    const s: Scenario = { ...scenario, hoaMonthly: (listing.hoaMonthly ?? 0) + scenario.hoaMonthly }
+    const s: Scenario = {
+      ...scenario,
+      hoaMonthly: (listing.hoaMonthly ?? 0) + scenario.hoaMonthly,
+    }
     return underwriting({ price: listing.price, rentMonthly: listing.rentEstimate, scenario: s })
   }, [listing, scenario])
 
   if (!listing || !results) {
     return (
       <div className="min-h-screen bg-zinc-50">
-        <div className="mx-auto max-w-4xl px-6 py-10">
+        <div className="mx-auto max-w-3xl px-6 py-10">
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
             <div className="text-lg font-semibold text-zinc-900">Listing not found</div>
             <div className="mt-2 text-sm text-zinc-600">
-              This usually means the listing id in the URL doesn’t match any seeded listings.
+              Requested id: <span className="font-semibold">{params.id}</span>
             </div>
-            <div className="mt-4 text-sm text-zinc-700">
-              Requested id: <span className="font-semibold">{rawId || "(missing)"}</span>
-            </div>
-            <div className="mt-1 text-sm text-zinc-700">
+            <div className="mt-1 text-sm text-zinc-600">
               Available ids:{" "}
-              <span className="font-semibold">
-                {LISTINGS.map((l) => l.id).join(", ")}
-              </span>
+              <span className="font-semibold">{LISTINGS.map((l) => l.id).join(", ")}</span>
             </div>
-            <Link href="/" className="mt-6 inline-block text-sm font-medium text-zinc-900 underline">
+            <Link href="/" className="mt-5 inline-block text-sm font-semibold text-zinc-900 underline">
               Back to results
             </Link>
           </div>
@@ -99,6 +107,7 @@ export default function ListingDetailPage({ params }: { params: { id?: string } 
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Left */}
           <div className="lg:col-span-8 space-y-6">
             <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -118,9 +127,14 @@ export default function ListingDetailPage({ params }: { params: { id?: string } 
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-1 gap-4">
+              {/* Gallery */}
+              <div className="mt-5 grid gap-4">
                 <div className="overflow-hidden rounded-xl border border-zinc-200">
-                  <img src={listing.images[activeImage]} alt="Main" className="h-[360px] w-full object-cover" />
+                  <img
+                    src={listing.images[activeImage]}
+                    alt="Main"
+                    className="h-[360px] w-full object-cover"
+                  />
                 </div>
 
                 <div className="flex gap-3 overflow-x-auto pb-1">
@@ -130,7 +144,9 @@ export default function ListingDetailPage({ params }: { params: { id?: string } 
                       <button
                         key={src}
                         onClick={() => setActiveImage(idx)}
-                        className={`overflow-hidden rounded-lg border ${isActive ? "border-zinc-900" : "border-zinc-200"}`}
+                        className={`overflow-hidden rounded-lg border ${
+                          isActive ? "border-zinc-900" : "border-zinc-200"
+                        }`}
                       >
                         <img src={src} alt="Thumb" className="h-20 w-28 object-cover" />
                       </button>
@@ -139,12 +155,17 @@ export default function ListingDetailPage({ params }: { params: { id?: string } 
                 </div>
               </div>
 
+              {/* Overview */}
               <div className="mt-6">
                 <div className="text-sm font-semibold text-zinc-900">Overview</div>
                 <p className="mt-2 text-sm leading-6 text-zinc-700">{listing.description}</p>
+
                 <div className="mt-4 flex flex-wrap gap-2">
                   {listing.highlights.map((h) => (
-                    <span key={h} className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs text-zinc-700">
+                    <span
+                      key={h}
+                      className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs text-zinc-700"
+                    >
                       {h}
                     </span>
                   ))}
@@ -157,7 +178,7 @@ export default function ListingDetailPage({ params }: { params: { id?: string } 
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <Fact label="Beds" value={`${listing.beds}`} />
                 <Fact label="Baths" value={`${listing.baths}`} />
-                <Fact label="Sqft" value={`${listing.sqft.toLocaleString()}`} />
+                <Fact label="Sqft" value={listing.sqft.toLocaleString()} />
                 <Fact label="HOA" value={fmtMoney(listing.hoaMonthly ?? 0)} />
                 <Fact label="Est rent" value={fmtMoney(listing.rentEstimate)} />
                 <Fact label="Mortgage" value={fmtMoney(results.mortgage)} />
@@ -167,6 +188,7 @@ export default function ListingDetailPage({ params }: { params: { id?: string } 
             </div>
           </div>
 
+          {/* Right */}
           <div className="lg:col-span-4">
             <div className="sticky top-6 space-y-4">
               <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -190,6 +212,7 @@ export default function ListingDetailPage({ params }: { params: { id?: string } 
                     value={scenario.interestRatePct}
                     onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
                   />
+
                   <SliderRow
                     label="Down payment"
                     valueLabel={`${Math.round(scenario.downPaymentPct * 100)}%`}
@@ -204,26 +227,31 @@ export default function ListingDetailPage({ params }: { params: { id?: string } 
                     <div className="text-xs font-medium text-zinc-600">Monthly cash flow</div>
                     <div className={`mt-1 text-2xl font-bold ${cashFlowColor}`}>{fmtMoney(results.cashFlow)}</div>
                     <div className="mt-2 text-xs text-zinc-600">
-                      Total cost: <span className="font-semibold text-zinc-900">{fmtMoney(results.totalMonthlyCost)}</span>
+                      Total cost:{" "}
+                      <span className="font-semibold text-zinc-900">{fmtMoney(results.totalMonthlyCost)}</span>
                       {" · "}
-                      CoC: <span className="font-semibold text-zinc-900">{fmtPct(results.cocReturnPct)}</span>
+                      Cap: <span className="font-semibold text-zinc-900">{fmtPct(results.capRatePct)}</span>
                     </div>
-                  </div>
-
-                  <div className="text-xs text-zinc-500">
-                    Demo assumptions only. Later you’ll load NWMLS data and store scenarios per user.
                   </div>
                 </div>
               </div>
 
-              {/* Map on detail page */}
               <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <div className="text-sm font-semibold text-zinc-900">Map</div>
                 <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200">
-             <iframe
-                title="map"
-                className="h-[260px] w-full"
-                loading="lazy"
-                src={`https://www.google.com/maps?q=${listing.lat},${listing.lng}&z=14&output=embed`}
-            />
+                  <iframe
+                    title="map"
+                    className="h-[260px] w-full"
+                    loading="lazy"
+                    src={`https://www.google.com/maps?q=${listing.lat},${listing.lng}&z=14&output=embed`}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
+      </div>
+    </div>
+  )
+}
