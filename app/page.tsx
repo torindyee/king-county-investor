@@ -342,7 +342,7 @@ export default function Home() {
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold text-zinc-900">Assumptions</div>
                   <button
-                    onClick={() => setScenario(DEFAULT_SCENENARIO)}
+                    onClick={() => setScenario(DEFAULT_SCENARIO)}
                     className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
                   >
                     Reset
