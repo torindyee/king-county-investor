@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
+import { useParams } from "next/navigation"
 import { LISTINGS } from "../../lib/listings"
 import { Scenario, fmtMoney, fmtPct, underwriting } from "../../lib/finance"
 
@@ -56,9 +57,12 @@ function Fact(props: { label: string; value: string; valueClass?: string }) {
   )
 }
 
-export default function ListingDetailPage({ params }: { params: { id: string } }) {
-  const listingId = Number(params.id)
-  const listing = LISTINGS.find((l) => l.id === listingId)
+export default function ListingDetailPage() {
+  const params = useParams<{ id?: string }>()
+const rawId = params?.id ?? ""
+const listingId = Number(rawId)
+const listing = LISTINGS.find((l) => l.id === listingId)
+
 
   const [scenario, setScenario] = useState<Scenario>(DEFAULT_SCENARIO)
   const [activeImage, setActiveImage] = useState(0)
@@ -79,7 +83,7 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
             <div className="text-lg font-semibold text-zinc-900">Listing not found</div>
             <div className="mt-2 text-sm text-zinc-600">
-              Requested id: <span className="font-semibold">{params.id}</span>
+              Requested id: <span className="font-semibold">{rawId || "(missing)"}</span>
             </div>
             <div className="mt-1 text-sm text-zinc-600">
               Available ids:{" "}
