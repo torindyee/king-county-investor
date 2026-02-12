@@ -45,8 +45,9 @@ function SliderRow(props: {
   )
 }
 
-export default function ListingDetailPage({ params }: { params: { id: string } }) {
-  const listingId = Number(params.id)
+export default function ListingDetailPage({ params }: { params: { id?: string } }) {
+  const rawId = params?.id ?? ""
+  const listingId = Number(rawId)
   const listing = LISTINGS.find((l) => l.id === listingId)
 
   const [scenario, setScenario] = useState<Scenario>(DEFAULT_SCENARIO)
@@ -64,9 +65,20 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
         <div className="mx-auto max-w-4xl px-6 py-10">
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
             <div className="text-lg font-semibold text-zinc-900">Listing not found</div>
-            <div className="mt-2 text-sm text-zinc-600">Go back to the listings page.</div>
-            <Link href="/" className="mt-4 inline-block text-sm font-medium text-zinc-900 underline">
-              Back
+            <div className="mt-2 text-sm text-zinc-600">
+              This usually means the listing id in the URL doesn’t match any seeded listings.
+            </div>
+            <div className="mt-4 text-sm text-zinc-700">
+              Requested id: <span className="font-semibold">{rawId || "(missing)"}</span>
+            </div>
+            <div className="mt-1 text-sm text-zinc-700">
+              Available ids:{" "}
+              <span className="font-semibold">
+                {LISTINGS.map((l) => l.id).join(", ")}
+              </span>
+            </div>
+            <Link href="/" className="mt-6 inline-block text-sm font-medium text-zinc-900 underline">
+              Back to results
             </Link>
           </div>
         </div>
@@ -87,7 +99,6 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* Main content */}
           <div className="lg:col-span-8 space-y-6">
             <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -96,7 +107,8 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                     {listing.address}, {listing.city}, {listing.state} {listing.zip}
                   </h1>
                   <div className="mt-1 text-sm text-zinc-600">
-                    {listing.type} · {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
+                    {listing.type} · {listing.beds} bd · {listing.baths} ba ·{" "}
+                    {listing.sqft.toLocaleString()} sqft
                     {listing.yearBuilt ? ` · Built ${listing.yearBuilt}` : ""}
                   </div>
                 </div>
@@ -106,14 +118,9 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                 </div>
               </div>
 
-              {/* Gallery */}
               <div className="mt-5 grid grid-cols-1 gap-4">
                 <div className="overflow-hidden rounded-xl border border-zinc-200">
-                  <img
-                    src={listing.images[activeImage]}
-                    alt="Main"
-                    className="h-[360px] w-full object-cover"
-                  />
+                  <img src={listing.images[activeImage]} alt="Main" className="h-[360px] w-full object-cover" />
                 </div>
 
                 <div className="flex gap-3 overflow-x-auto pb-1">
@@ -123,9 +130,7 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                       <button
                         key={src}
                         onClick={() => setActiveImage(idx)}
-                        className={`overflow-hidden rounded-lg border ${
-                          isActive ? "border-zinc-900" : "border-zinc-200"
-                        }`}
+                        className={`overflow-hidden rounded-lg border ${isActive ? "border-zinc-900" : "border-zinc-200"}`}
                       >
                         <img src={src} alt="Thumb" className="h-20 w-28 object-cover" />
                       </button>
@@ -134,11 +139,9 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                 </div>
               </div>
 
-              {/* Description */}
               <div className="mt-6">
                 <div className="text-sm font-semibold text-zinc-900">Overview</div>
                 <p className="mt-2 text-sm leading-6 text-zinc-700">{listing.description}</p>
-
                 <div className="mt-4 flex flex-wrap gap-2">
                   {listing.highlights.map((h) => (
                     <span key={h} className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs text-zinc-700">
@@ -149,7 +152,6 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
               </div>
             </div>
 
-            {/* Facts + Financial snapshot */}
             <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
               <div className="text-sm font-semibold text-zinc-900">Key facts</div>
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -162,29 +164,9 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                 <Fact label="Cash flow" value={fmtMoney(results.cashFlow)} valueClass={cashFlowColor} />
                 <Fact label="CoC return" value={fmtPct(results.cocReturnPct)} />
               </div>
-
-              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <BreakdownRow label="Mortgage" value={results.mortgage} />
-                <BreakdownRow label="Taxes" value={results.taxesMonthly} />
-                <BreakdownRow label="Insurance" value={results.insuranceMonthly} />
-                <BreakdownRow label="HOA" value={results.hoaMonthly} />
-                <BreakdownRow label="Vacancy" value={results.vacancy} />
-                <BreakdownRow label="Management" value={results.management} />
-                <BreakdownRow label="Maintenance" value={results.maintenance} />
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                  <div className="text-xs font-medium text-zinc-600">Total monthly cost</div>
-                  <div className="mt-1 text-lg font-bold text-zinc-900">{fmtMoney(results.totalMonthlyCost)}</div>
-                  <div className="mt-2 text-xs text-zinc-600">
-                    Rent ÷ Payment: <span className="font-semibold text-zinc-900">{results.rentToPayment.toFixed(2)}x</span>
-                    {" · "}
-                    Cap: <span className="font-semibold text-zinc-900">{fmtPct(results.capRatePct)}</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Underwriting panel */}
           <div className="lg:col-span-4">
             <div className="sticky top-6 space-y-4">
               <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -208,7 +190,6 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                     value={scenario.interestRatePct}
                     onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
                   />
-
                   <SliderRow
                     label="Down payment"
                     valueLabel={`${Math.round(scenario.downPaymentPct * 100)}%`}
@@ -219,57 +200,13 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                     onChange={(v) => setScenario({ ...scenario, downPaymentPct: v / 100 })}
                   />
 
-                  <SliderRow
-                    label="Taxes (annual rate)"
-                    valueLabel={`${scenario.propertyTaxRatePct.toFixed(2)}%`}
-                    min={0.5}
-                    max={2.0}
-                    step={0.01}
-                    value={scenario.propertyTaxRatePct}
-                    onChange={(v) => setScenario({ ...scenario, propertyTaxRatePct: v })}
-                  />
-
-                  <SliderRow
-                    label="Insurance (monthly)"
-                    valueLabel={fmtMoney(scenario.insuranceMonthly)}
-                    min={50}
-                    max={400}
-                    step={10}
-                    value={scenario.insuranceMonthly}
-                    onChange={(v) => setScenario({ ...scenario, insuranceMonthly: v })}
-                  />
-
-                  <SliderRow
-                    label="Extra HOA (monthly)"
-                    valueLabel={fmtMoney(scenario.hoaMonthly)}
-                    min={0}
-                    max={600}
-                    step={25}
-                    value={scenario.hoaMonthly}
-                    onChange={(v) => setScenario({ ...scenario, hoaMonthly: v })}
-                  />
-
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                     <div className="text-xs font-medium text-zinc-600">Monthly cash flow</div>
                     <div className={`mt-1 text-2xl font-bold ${cashFlowColor}`}>{fmtMoney(results.cashFlow)}</div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-zinc-600">
-                      <div>
-                        <div className="font-medium text-zinc-900">CoC</div>
-                        <div>{fmtPct(results.cocReturnPct)}</div>
-                      </div>
-                      <div>
-                        <div className="font-medium text-zinc-900">Cap rate</div>
-                        <div>{fmtPct(results.capRatePct)}</div>
-                      </div>
-                      <div>
-                        <div className="font-medium text-zinc-900">Cash invested</div>
-                        <div>{fmtMoney(results.cashInvested)}</div>
-                      </div>
-                      <div>
-                        <div className="font-medium text-zinc-900">Total cost</div>
-                        <div>{fmtMoney(results.totalMonthlyCost)}</div>
-                      </div>
+                    <div className="mt-2 text-xs text-zinc-600">
+                      Total cost: <span className="font-semibold text-zinc-900">{fmtMoney(results.totalMonthlyCost)}</span>
+                      {" · "}
+                      CoC: <span className="font-semibold text-zinc-900">{fmtPct(results.cocReturnPct)}</span>
                     </div>
                   </div>
 
@@ -278,29 +215,13 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
-function Fact(props: { label: string; value: string; valueClass?: string }) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-      <div className="text-xs font-medium text-zinc-600">{props.label}</div>
-      <div className={`mt-1 text-base font-bold text-zinc-900 ${props.valueClass ?? ""}`}>{props.value}</div>
-    </div>
-  )
-}
-
-function BreakdownRow(props: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4">
-      <div className="text-xs font-medium text-zinc-600">{props.label}</div>
-      <div className="mt-1 text-base font-semibold text-zinc-900">{fmtMoney(props.value)}</div>
-    </div>
-  )
-}
-
+              {/* Map on detail page */}
+              <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <div className="text-sm font-semibold text-zinc-900">Map</div>
+                <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200">
+                  <iframe
+                    title="map"
+                    className="h-[260px] w-full"
+                    loading="lazy"
+                    src={`https://www.google.com/maps?q=${listing.lat},${listing.lng}&z=14
