@@ -696,3 +696,15 @@ export default function Home() {
     </div>
   )
 }
+
+function MetricCard(props: { label: string; value: string; valueClass?: string }) {
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-3">
+      <div className="text-xs text-zinc-600">{props.label}</div>
+      <div className={`mt-1 text-sm font-semibold text-zinc-900 ${props.valueClass ?? ""}`}>
+        {props.value}
+      </div>
+    </div>
+  )
+}
+
