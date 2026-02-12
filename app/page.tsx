@@ -498,11 +498,10 @@ export default function Home() {
           <div className="lg:col-span-8">
             {viewMode === "list" ? (
               <div className="grid gap-4">
-                {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts }) => {
+                {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts }) => (
                   const cashFlowColor = u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
                   const quickColor = quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"
 
-                  return (
                     <Link
                       key={listing.id}
                       href={`/listing/${String(listing.id)}`}
@@ -603,8 +602,7 @@ export default function Home() {
                         </div>
                       </div>
                     </Link>
-                  )
-                })}
+))}
               </div>
             ) : (
               <div className="grid gap-4 lg:grid-cols-12">
