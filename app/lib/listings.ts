@@ -8,6 +8,8 @@ export type Listing = {
   beds: number
   baths: number
   sqft: number
+  lat: number
+  lng: number
   type: "Single Family" | "Condo" | "Townhome" | "Multi Family"
   yearBuilt?: number
   lotSqft?: number
@@ -30,6 +32,8 @@ export const LISTINGS: Listing[] = [
     beds: 3,
     baths: 2,
     sqft: 1850,
+    lat: 47.6340,
+    lng: -122.3565,
     type: "Single Family",
     yearBuilt: 1998,
     lotSqft: 3200,
@@ -60,6 +64,8 @@ export const LISTINGS: Listing[] = [
     beds: 2,
     baths: 2,
     sqft: 1400,
+    lat: 47.6687,
+    lng: -122.3860,
     type: "Townhome",
     yearBuilt: 2012,
     hoaMonthly: 185,
@@ -89,6 +95,8 @@ export const LISTINGS: Listing[] = [
     beds: 4,
     baths: 3,
     sqft: 2300,
+    lat: 47.6769,
+    lng: -122.2050,
     type: "Single Family",
     yearBuilt: 1987,
     lotSqft: 5400,
