@@ -498,111 +498,122 @@ export default function Home() {
           <div className="lg:col-span-8">
             {viewMode === "list" ? (
               <div className="grid gap-4">
-                {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts }) => (
-                  const cashFlowColor = u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
-                  const quickColor = quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"
+              {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts }) => {
+  const cashFlowColor = u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
+  const quickColor =
+    quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"
 
-                    <Link
-                      key={listing.id}
-                      href={`/listing/${String(listing.id)}`}
-                      className="group overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md"
-                    >
-                      <div className="flex flex-col sm:flex-row">
-                        <div className="relative h-56 w-full sm:h-auto sm:w-72">
-                          <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
+  return (
+    <Link
+      key={listing.id}
+      href={`/listing/${String(listing.id)}`}
+      className="group overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md"
+    >
+      <div className="flex flex-col sm:flex-row">
+        <div className="relative h-56 w-full sm:h-auto sm:w-72">
+          <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
 
-                          {favorites.includes(listing.id) && (
-                            <div className="absolute right-3 top-3 rounded-full bg-emerald-800 px-3 py-1 text-xs font-semibold text-white">
-                              Saved
-                            </div>
-                          )}
-                        </div>
+          {favorites.includes(listing.id) && (
+            <div className="absolute right-3 top-3 rounded-full bg-emerald-800 px-3 py-1 text-xs font-semibold text-white">
+              Saved
+            </div>
+          )}
+        </div>
 
-                        <div className="flex-1 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="text-lg font-semibold text-zinc-900 group-hover:underline">
-                                {listing.address}, {listing.city}
-                              </div>
-                              <div className="mt-1 text-sm text-zinc-600">
-                                {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
-                              </div>
-                            </div>
+        <div className="flex-1 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-lg font-semibold text-zinc-900 group-hover:underline">
+                {listing.address}, {listing.city}
+              </div>
+              <div className="mt-1 text-sm text-zinc-600">
+                {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
+              </div>
+            </div>
 
-                            {/* smaller save */}
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                const next = toggleFavorite(listing.id)
-                                setFavorites(next)
-                              }}
-                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                                favorites.includes(listing.id)
-                                  ? "border-emerald-800 bg-emerald-800 text-white"
-                                  : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
-                              }`}
-                            >
-                              {favorites.includes(listing.id) ? "Saved" : "Save"}
-                            </button>
-                          </div>
+            {/* smaller save */}
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const next = toggleFavorite(listing.id)
+                setFavorites(next)
+              }}
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                favorites.includes(listing.id)
+                  ? "border-emerald-800 bg-emerald-800 text-white"
+                  : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
+              }`}
+            >
+              {favorites.includes(listing.id) ? "Saved" : "Save"}
+            </button>
+          </div>
 
-                          {/* Price prominent */}
-                          <div className="mt-3 flex items-end justify-between">
-                            <div>
-                              <div className="text-xs text-zinc-600">Price</div>
-                              <div className="text-2xl font-bold text-zinc-900">{fmtMoney(listing.price)}</div>
-                            </div>
+          {/* Price prominent */}
+          <div className="mt-3 flex items-end justify-between">
+            <div>
+              <div className="text-xs text-zinc-600">Price</div>
+              <div className="text-2xl font-bold text-zinc-900">{fmtMoney(listing.price)}</div>
+            </div>
 
-                            <div className="text-right text-xs text-zinc-500">
-                              CoC {fmtPct(u.cocReturnPct)} · Cap {fmtPct(u.capRatePct)}
-                            </div>
-                          </div>
-                            
-                                                 {/* Metrics strip */}
-                            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                              <MetricCard label="Est rent" value={fmtMoney(listing.rentEstimate)} />
-                              <MetricCard label="Mortgage" value={fmtMoney(u.mortgage)} />
-                              <MetricCard label="Rent − Mortgage" value={fmtMoney(quickRentMinusMortgage)} valueClass={quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"} />
-                              <MetricCard label="All in cash flow" value={fmtMoney(u.cashFlow)} valueClass={u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"} />
-                            </div>
-                            
-                            {/* Other costs (hover breakdown) */}
-                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                              <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
-                                Rent ÷ Payment: {u.rentToPayment.toFixed(2)}x
-                              </span>
-                            
-                              <div className="relative group">
-                                <span className="cursor-default rounded-full border border-emerald-100 bg-emerald-50/60 px-3 py-1 text-emerald-900">
-                                  Other costs: {fmtMoney(otherCosts)}
-                                </span>
-                            
-                                <div className="pointer-events-none absolute left-0 top-full mt-2 z-20 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-lg group-hover:block">
-                                  <div className="text-xs font-semibold text-zinc-900">Other costs breakdown</div>
-                                  <div className="mt-2 grid grid-cols-2 gap-2">
-                                    <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
-                                    <div>Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
-                                    <div>HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span></div>
-                                    <div>Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span></div>
-                                    <div>Management: <span className="font-semibold">{fmtMoney(u.management)}</span></div>
-                                    <div>Maintenance: <span className="font-semibold">{fmtMoney(u.maintenance)}</span></div>
-                                  </div>
-                                  <div className="mt-2 border-t pt-2">
-                                    Total: <span className="font-semibold">{fmtMoney(otherCosts)}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            
-                              <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
-                                HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-))}
+            <div className="text-right text-xs text-zinc-500">
+              CoC {fmtPct(u.cocReturnPct)} · Cap {fmtPct(u.capRatePct)}
+            </div>
+          </div>
+
+          {/* Metrics strip */}
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard label="Est rent" value={fmtMoney(listing.rentEstimate)} />
+            <MetricCard label="Mortgage" value={fmtMoney(u.mortgage)} />
+            <MetricCard
+              label="Rent − Mortgage"
+              value={fmtMoney(quickRentMinusMortgage)}
+              valueClass={quickColor}
+            />
+            <MetricCard
+              label="All in cash flow"
+              value={fmtMoney(u.cashFlow)}
+              valueClass={cashFlowColor}
+            />
+          </div>
+
+          {/* Other costs (hover breakdown) */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
+              Rent ÷ Payment: {u.rentToPayment.toFixed(2)}x
+            </span>
+
+            <div className="relative group">
+              <span className="cursor-default rounded-full border border-emerald-100 bg-emerald-50/60 px-3 py-1 text-emerald-900">
+                Other costs: {fmtMoney(otherCosts)}
+              </span>
+
+              <div className="pointer-events-none absolute left-0 top-full mt-2 z-20 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-lg group-hover:block">
+                <div className="text-xs font-semibold text-zinc-900">Other costs breakdown</div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
+                  <div>Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
+                  <div>HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span></div>
+                  <div>Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span></div>
+                  <div>Management: <span className="font-semibold">{fmtMoney(u.management)}</span></div>
+                  <div>Maintenance: <span className="font-semibold">{fmtMoney(u.maintenance)}</span></div>
+                </div>
+                <div className="mt-2 border-t pt-2">
+                  Total: <span className="font-semibold">{fmtMoney(otherCosts)}</span>
+                </div>
+              </div>
+            </div>
+
+            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
+              HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo
+            </span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+})}
+
               </div>
             ) : (
               <div className="grid gap-4 lg:grid-cols-12">
