@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { LISTINGS } from "../../../lib/listings"
-import { Scenario, fmtMoney, fmtPct, underwriting } from "../../../lib/finance"
+import { LISTINGS } from "../../lib/listings"
+import { Scenario, fmtMoney, fmtPct, underwriting } from "../../lib/finance"
 
 const DEFAULT_SCENARIO: Scenario = {
   downPaymentPct: 0.25,
