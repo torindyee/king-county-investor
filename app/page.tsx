@@ -77,6 +77,7 @@ function ListingMap(props: {
   const mapDivRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<any>(null)
   const markersLayerRef = useRef<any>(null)
+  const [tileError, setTileError] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -95,8 +96,8 @@ function ListingMap(props: {
 
     const loadJs = () =>
       new Promise<void>((resolve) => {
-        const id = "leaflet-js"
         if ((window as any).L) return resolve()
+        const id = "leaflet-js"
         if (document.getElementById(id)) {
           const interval = setInterval(() => {
             if ((window as any).L) {
@@ -120,18 +121,26 @@ function ListingMap(props: {
 
       const L = (window as any).L
       if (!mapDivRef.current) return
+
       if (!mapRef.current) {
-        mapRef.current = L.map(mapDivRef.current, {
-          zoomControl: true,
-          attributionControl: true,
+        mapRef.current = L.map(mapDivRef.current)
+
+        const layer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
         })
 
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-        }).addTo(mapRef.current)
+        layer.on("tileerror", () => setTileError(true))
+        layer.addTo(mapRef.current)
 
         markersLayerRef.current = L.layerGroup().addTo(mapRef.current)
       }
+
+      // Force Leaflet to re-measure the container after render
+      setTimeout(() => {
+        try {
+          mapRef.current?.invalidateSize?.()
+        } catch {}
+      }, 200)
     }
 
     init()
@@ -162,18 +171,28 @@ function ListingMap(props: {
 
     if (props.selectedId) {
       const chosen = props.points.find((x) => x.id === props.selectedId)
-      if (chosen) {
-        mapRef.current.setView([chosen.lat, chosen.lng], 14)
-      }
+      if (chosen) mapRef.current.setView([chosen.lat, chosen.lng], 14)
     }
   }, [props.points, props.selectedId, props.onSelect])
 
   return (
-    <div className="rounded-xl border border-emerald-100 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-emerald-100 bg-white shadow-sm overflow-hidden relative">
       <div ref={mapDivRef} className="h-[560px] w-full" />
+
+      {tileError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/90 p-6 text-center">
+          <div>
+            <div className="text-sm font-semibold text-zinc-900">Map tiles blocked</div>
+            <div className="mt-1 text-xs text-zinc-600">
+              Your network may be blocking OpenStreetMap tiles. Pins still work when tiles are available.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
 
 export default function Home() {
   const [scenario, setScenario] = useState<Scenario>(DEFAULT_SCENARIO)
@@ -191,6 +210,8 @@ export default function Home() {
   const [minMortgage, setMinMortgage] = useState(0)
   const [maxMortgage, setMaxMortgage] = useState(0)
   const [minCashFlow, setMinCashFlow] = useState(0)
+  const [minHoa, setMinHoa] = useState(0)
+  const [maxHoa, setMaxHoa] = useState(0)
 
   useEffect(() => {
     setFavorites(getFavorites())
@@ -229,7 +250,10 @@ export default function Home() {
       const cashFlowOk = minCashFlow ? u.cashFlow >= minCashFlow : true
       const favOk = onlyFavorites ? favorites.includes(listing.id) : true
 
-      return priceOk && rentOk && mortgageOk && cashFlowOk && favOk
+      const hoa = listing.hoaMonthly ?? 0
+      const hoaOk = (minHoa ? hoa >= minHoa : true) && (maxHoa ? hoa <= maxHoa : true)
+
+      return priceOk && rentOk && mortgageOk && cashFlowOk && hoa0k && favOk
     })
 
     const sorted = [...filtered].sort((a, b) => {
@@ -255,6 +279,8 @@ export default function Home() {
     minMortgage,
     maxMortgage,
     minCashFlow,
+    minHoa,
+    maxHoa,
     onlyFavorites,
     favorites,
   ])
@@ -390,15 +416,11 @@ export default function Home() {
                     onChange={(v) => setScenario({ ...scenario, insuranceMonthly: v })}
                   />
 
-                  <SliderRow
-                    label="Extra HOA (monthly)"
-                    valueLabel={fmtMoney(scenario.hoaMonthly)}
-                    min={0}
-                    max={600}
-                    step={25}
-                    value={scenario.hoaMonthly}
-                    onChange={(v) => setScenario({ ...scenario, hoaMonthly: v })}
-                  />
+                  <div className="pt-2">
+                    <div className="border-t border-zinc-200 pt-3 text-xs font-semibold text-zinc-600">
+                      Operating reserves
+                    </div>
+                  </div>
 
                   {/* Adjustable reserve percentages */}
                   <SliderRow
@@ -441,6 +463,7 @@ export default function Home() {
                       setMinRent(0); setMaxRent(0)
                       setMinMortgage(0); setMaxMortgage(0)
                       setMinCashFlow(0)
+                      setMinHoa(0); setMaxHoa(0)
                     }}
                     className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
                   >
@@ -454,6 +477,9 @@ export default function Home() {
 
                   <NumberField label="Rent min" value={minRent} onChange={setMinRent} placeholder="e.g. 3000" />
                   <NumberField label="Rent max" value={maxRent} onChange={setMaxRent} placeholder="e.g. 5500" />
+
+                  <NumberField label="HOA min" value={minHoa} onChange={setMinHoa} placeholder="e.g. 0" />
+                  <NumberField label="HOA max" value={maxHoa} onChange={setMaxHoa} placeholder="e.g. 600" />
 
                   <NumberField label="Mortgage min" value={minMortgage} onChange={setMinMortgage} placeholder="e.g. 2500" />
                   <NumberField label="Mortgage max" value={maxMortgage} onChange={setMaxMortgage} placeholder="e.g. 4500" />
@@ -533,46 +559,46 @@ export default function Home() {
                               CoC {fmtPct(u.cocReturnPct)} · Cap {fmtPct(u.capRatePct)}
                             </div>
                           </div>
-
-                          {/* Main investor metrics */}
-                          <div className="mt-4 grid grid-cols-3 gap-3">
-                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                              <div className="text-xs text-zinc-600">Est rent</div>
-                              <div className="text-sm font-semibold text-zinc-900">{fmtMoney(listing.rentEstimate)}</div>
+                            
+                                                 {/* Metrics strip */}
+                            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                              <MetricCard label="Est rent" value={fmtMoney(listing.rentEstimate)} />
+                              <MetricCard label="Mortgage" value={fmtMoney(u.mortgage)} />
+                              <MetricCard label="Rent − Mortgage" value={fmtMoney(quickRentMinusMortgage)} valueClass={quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"} />
+                              <MetricCard label="All in cash flow" value={fmtMoney(u.cashFlow)} valueClass={u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"} />
                             </div>
-                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                              <div className="text-xs text-zinc-600">Mortgage</div>
-                              <div className="text-sm font-semibold text-zinc-900">{fmtMoney(u.mortgage)}</div>
-                            </div>
-                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                              <div className="text-xs text-zinc-600">All in cash flow</div>
-                              <div className={`text-sm font-semibold ${cashFlowColor}`}>{fmtMoney(u.cashFlow)}</div>
-                            </div>
-                          </div>
-
-                          {/* Explain the difference */}
-                          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                            <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
-                              <div className="text-xs text-zinc-600">Rent − Mortgage (quick)</div>
-                              <div className={`text-sm font-semibold ${quickColor}`}>{fmtMoney(quickRentMinusMortgage)}</div>
-                            </div>
-
-                            <div className="rounded-lg border border-zinc-200 bg-white p-3 sm:col-span-2">
-                              <div className="text-xs text-zinc-600">Other costs (tax, ins, HOA, reserves)</div>
-                              <div className="text-sm font-semibold text-zinc-900">{fmtMoney(otherCosts)}</div>
-                              <div className="mt-1 text-[11px] text-zinc-500">
-                                Taxes {fmtMoney(u.taxesMonthly)} · Ins {fmtMoney(u.insuranceMonthly)} · HOA {fmtMoney(u.hoaMonthly)} · Vacancy {fmtMoney(u.vacancy)} · Mgmt {fmtMoney(u.management)} · Maint {fmtMoney(u.maintenance)}
+                            
+                            {/* Other costs (hover breakdown) */}
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                              <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
+                                Rent ÷ Payment: {u.rentToPayment.toFixed(2)}x
+                              </span>
+                            
+                              <div className="relative group">
+                                <span className="cursor-default rounded-full border border-emerald-100 bg-emerald-50/60 px-3 py-1 text-emerald-900">
+                                  Other costs: {fmtMoney(otherCosts)}
+                                </span>
+                            
+                                <div className="pointer-events-none absolute left-0 top-full mt-2 z-20 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-lg group-hover:block">
+                                  <div className="text-xs font-semibold text-zinc-900">Other costs breakdown</div>
+                                  <div className="mt-2 grid grid-cols-2 gap-2">
+                                    <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
+                                    <div>Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
+                                    <div>HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span></div>
+                                    <div>Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span></div>
+                                    <div>Management: <span className="font-semibold">{fmtMoney(u.management)}</span></div>
+                                    <div>Maintenance: <span className="font-semibold">{fmtMoney(u.maintenance)}</span></div>
+                                  </div>
+                                  <div className="mt-2 border-t pt-2">
+                                    Total: <span className="font-semibold">{fmtMoney(otherCosts)}</span>
+                                  </div>
+                                </div>
                               </div>
+                            
+                              <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
+                                HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo
+                              </span>
                             </div>
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-600">
-                            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1">
-                              Rent ÷ Payment: {u.rentToPayment.toFixed(2)}x
-                            </span>
-                            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1">
-                              Taxes: {fmtMoney(u.taxesMonthly)}/mo
-                            </span>
                           </div>
                         </div>
                       </div>
