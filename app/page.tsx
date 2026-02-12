@@ -253,7 +253,7 @@ export default function Home() {
       const hoa = listing.hoaMonthly ?? 0
       const hoaOk = (minHoa ? hoa >= minHoa : true) && (maxHoa ? hoa <= maxHoa : true)
 
-      return priceOk && rentOk && mortgageOk && cashFlowOk && hoa0k && favOk
+      return priceOk && rentOk && mortgageOk && cashFlowOk && hoaOk && favOk
     })
 
     const sorted = [...filtered].sort((a, b) => {
