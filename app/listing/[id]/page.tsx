@@ -220,8 +220,10 @@ export default function ListingDetailPage({ params }: { params: { id?: string } 
               <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <div className="text-sm font-semibold text-zinc-900">Map</div>
                 <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200">
-                  <iframe
-                    title="map"
-                    className="h-[260px] w-full"
-                    loading="lazy"
-                    src={`https://www.google.com/maps?q=${listing.lat},${listing.lng}&z=14
+             <iframe
+                title="map"
+                className="h-[260px] w-full"
+                loading="lazy"
+                src={`https://www.google.com/maps?q=${listing.lat},${listing.lng}&z=14&output=embed`}
+            />
+
