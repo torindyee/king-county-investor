@@ -2,12 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 
-type Point = {
-  id: number
-  lat: number
-  lng: number
-  label: string
-}
+type Point = { id: number; lat: number; lng: number; label: string }
 
 export default function ListingMap(props: {
   points: Point[]
@@ -16,132 +11,114 @@ export default function ListingMap(props: {
 }) {
   const mapDivRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<any>(null)
-  const markersLayerRef = useRef<any>(null)
+  const markersRef = useRef<any[]>([])
   const [tileError, setTileError] = useState(false)
 
-  const hasPoints = props.points && props.points.length > 0
-
+  // load leaflet from CDN
   useEffect(() => {
     let cancelled = false
 
-    const loadCss = () =>
-      new Promise<void>((resolve) => {
-        const id = "leaflet-css"
-        if (document.getElementById(id)) return resolve()
+    async function loadLeaflet() {
+      if (typeof window === "undefined") return
+
+      // add CSS once
+      if (!document.getElementById("leaflet-css")) {
         const link = document.createElement("link")
-        link.id = id
+        link.id = "leaflet-css"
         link.rel = "stylesheet"
         link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        link.onload = () => resolve()
         document.head.appendChild(link)
-      })
-
-    const loadJs = () =>
-      new Promise<void>((resolve) => {
-        if ((window as any).L) return resolve()
-        const id = "leaflet-js"
-        if (document.getElementById(id)) {
-          const interval = setInterval(() => {
-            if ((window as any).L) {
-              clearInterval(interval)
-              resolve()
-            }
-          }, 50)
-          return
-        }
-        const script = document.createElement("script")
-        script.id = id
-        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        script.onload = () => resolve()
-        document.body.appendChild(script)
-      })
-
-    const init = async () => {
-      await loadCss()
-      await loadJs()
-      if (cancelled) return
-      if (!mapDivRef.current) return
-
-      const L = (window as any).L
-
-      if (!mapRef.current) {
-        mapRef.current = L.map(mapDivRef.current, {
-          zoomControl: true,
-        })
-
-        const layer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-        })
-
-        layer.on("tileerror", () => setTileError(true))
-        layer.addTo(mapRef.current)
-
-        markersLayerRef.current = L.layerGroup().addTo(mapRef.current)
       }
 
-      // If the container mounted while hidden, Leaflet needs a resize nudge.
-      setTimeout(() => {
-        try {
-          mapRef.current?.invalidateSize?.()
-        } catch {}
-      }, 200)
+      // add JS once
+      if (!(window as any).L) {
+        await new Promise<void>((resolve, reject) => {
+          const s = document.createElement("script")
+          s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          s.onload = () => resolve()
+          s.onerror = () => reject(new Error("Leaflet failed to load"))
+          document.body.appendChild(s)
+        })
+      }
+
+      if (cancelled) return
+      const L = (window as any).L
+      if (!L || !mapDivRef.current) return
+
+      // create map once
+      if (!mapRef.current) {
+        const map = L.map(mapDivRef.current, { zoomControl: true })
+        mapRef.current = map
+
+        const tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors",
+        })
+
+        tiles.on("tileerror", () => setTileError(true))
+        tiles.addTo(map)
+      }
     }
 
-    init()
+    loadLeaflet()
 
     return () => {
       cancelled = true
     }
   }, [])
 
+  const center = useMemo(() => {
+    if (props.points.length === 0) return { lat: 47.6062, lng: -122.3321 } // Seattle fallback
+    return { lat: props.points[0].lat, lng: props.points[0].lng }
+  }, [props.points])
+
+  // update markers when points change
   useEffect(() => {
     const L = (window as any).L
-    if (!L || !mapRef.current || !markersLayerRef.current) return
+    const map = mapRef.current
+    if (!L || !map) return
 
-    markersLayerRef.current.clearLayers()
+    // clear old markers
+    markersRef.current.forEach((m) => m.remove())
+    markersRef.current = []
 
-    const bounds: any[] = []
+    if (props.points.length === 0) {
+      map.setView([center.lat, center.lng], 10)
+      return
+    }
+
+    const bounds = L.latLngBounds(props.points.map((p) => [p.lat, p.lng]))
+    map.fitBounds(bounds, { padding: [40, 40] })
 
     props.points.forEach((p) => {
-      if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) return
-      const marker = L.marker([p.lat, p.lng]).addTo(markersLayerRef.current)
-      marker.bindPopup(p.label)
+      const marker = L.marker([p.lat, p.lng]).addTo(map)
       marker.on("click", () => props.onSelect(p.id))
-      bounds.push([p.lat, p.lng])
+      markersRef.current.push(marker)
     })
+  }, [props.points, props.onSelect, center.lat, center.lng])
 
-    if (bounds.length > 0 && !props.selectedId) {
-      mapRef.current.fitBounds(bounds, { padding: [30, 30] })
-    }
+  // highlight selected marker
+  useEffect(() => {
+    const L = (window as any).L
+    const map = mapRef.current
+    if (!L || !map) return
+    if (props.selectedId == null) return
 
-    if (props.selectedId) {
-      const chosen = props.points.find((x) => x.id === props.selectedId)
-      if (chosen) mapRef.current.setView([chosen.lat, chosen.lng], 14)
-    }
-  }, [props.points, props.selectedId, props.onSelect])
+    const selected = props.points.find((p) => p.id === props.selectedId)
+    if (!selected) return
+
+    map.setView([selected.lat, selected.lng], Math.max(map.getZoom(), 12))
+  }, [props.selectedId, props.points])
 
   return (
     <div className="rounded-xl border border-emerald-100 bg-white shadow-sm overflow-hidden relative">
-      {/* Fixed height so it never collapses to grey */}
       <div ref={mapDivRef} className="h-[560px] w-full" />
-
-      {!hasPoints && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/90 p-6 text-center">
-          <div>
-            <div className="text-sm font-semibold text-zinc-900">No listings to show</div>
-            <div className="mt-1 text-xs text-zinc-600">
-              Adjust filters or add lat/lng to your fake listings.
-            </div>
-          </div>
-        </div>
-      )}
 
       {tileError && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/90 p-6 text-center">
           <div>
             <div className="text-sm font-semibold text-zinc-900">Map tiles blocked</div>
             <div className="mt-1 text-xs text-zinc-600">
-              Your network may block OpenStreetMap tiles. Try a different network.
+              Your network may be blocking OpenStreetMap tiles. Pins still work when tiles are available.
             </div>
           </div>
         </div>
