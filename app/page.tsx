@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { LISTINGS } from "./lib/listings"
 import ListingMap from "./ListingMap"
 import { Scenario, fmtMoney, fmtPct, underwriting } from "./lib/finance"
@@ -68,128 +68,6 @@ function NumberField(props: {
     </div>
   )
 }
-
-// Leaflet Map (CDN) — no installs
- {
-  const mapDivRef = useRef<HTMLDivElement | null>(null)
-  const mapRef = useRef<any>(null)
-  const markersLayerRef = useRef<any>(null)
-  const [tileError, setTileError] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-
-    const loadCss = () =>
-      new Promise<void>((resolve) => {
-        const id = "leaflet-css"
-        if (document.getElementById(id)) return resolve()
-        const link = document.createElement("link")
-        link.id = id
-        link.rel = "stylesheet"
-        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        link.onload = () => resolve()
-        document.head.appendChild(link)
-      })
-
-    const loadJs = () =>
-      new Promise<void>((resolve) => {
-        if ((window as any).L) return resolve()
-        const id = "leaflet-js"
-        if (document.getElementById(id)) {
-          const interval = setInterval(() => {
-            if ((window as any).L) {
-              clearInterval(interval)
-              resolve()
-            }
-          }, 50)
-          return
-        }
-        const script = document.createElement("script")
-        script.id = id
-        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        script.onload = () => resolve()
-        document.body.appendChild(script)
-      })
-
-    const init = async () => {
-      await loadCss()
-      await loadJs()
-      if (cancelled) return
-
-      const L = (window as any).L
-      if (!mapDivRef.current) return
-
-      if (!mapRef.current) {
-        mapRef.current = L.map(mapDivRef.current)
-
-        const layer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-        })
-
-        layer.on("tileerror", () => setTileError(true))
-        layer.addTo(mapRef.current)
-
-        markersLayerRef.current = L.layerGroup().addTo(mapRef.current)
-      }
-
-      // Force Leaflet to re-measure the container after render
-      setTimeout(() => {
-        try {
-          mapRef.current?.invalidateSize?.()
-        } catch {}
-      }, 200)
-    }
-
-    init()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    const L = (window as any).L
-    if (!L || !mapRef.current || !markersLayerRef.current) return
-
-    markersLayerRef.current.clearLayers()
-
-    const bounds: any[] = []
-
-    props.points.forEach((p) => {
-      const marker = L.marker([p.lat, p.lng]).addTo(markersLayerRef.current)
-      marker.bindPopup(p.label)
-      marker.on("click", () => props.onSelect(p.id))
-      bounds.push([p.lat, p.lng])
-    })
-
-    if (props.points.length > 0 && !props.selectedId) {
-      mapRef.current.fitBounds(bounds, { padding: [30, 30] })
-    }
-
-    if (props.selectedId) {
-      const chosen = props.points.find((x) => x.id === props.selectedId)
-      if (chosen) mapRef.current.setView([chosen.lat, chosen.lng], 14)
-    }
-  }, [props.points, props.selectedId, props.onSelect])
-
-  return (
-    <div className="rounded-xl border border-emerald-100 bg-white shadow-sm overflow-hidden relative">
-      <div ref={mapDivRef} className="h-[560px] w-full" />
-
-      {tileError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/90 p-6 text-center">
-          <div>
-            <div className="text-sm font-semibold text-zinc-900">Map tiles blocked</div>
-            <div className="mt-1 text-xs text-zinc-600">
-              Your network may be blocking OpenStreetMap tiles. Pins still work when tiles are available.
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 
 export default function Home() {
   const [scenario, setScenario] = useState<Scenario>(DEFAULT_SCENARIO)
@@ -419,7 +297,6 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Adjustable reserve percentages */}
                   <SliderRow
                     label="Vacancy"
                     valueLabel={`${Math.round(scenario.vacancyPct * 100)}%`}
@@ -456,11 +333,15 @@ export default function Home() {
                   <div className="text-sm font-semibold text-zinc-900">Filters</div>
                   <button
                     onClick={() => {
-                      setMinPrice(0); setMaxPrice(0)
-                      setMinRent(0); setMaxRent(0)
-                      setMinMortgage(0); setMaxMortgage(0)
+                      setMinPrice(0)
+                      setMaxPrice(0)
+                      setMinRent(0)
+                      setMaxRent(0)
+                      setMinMortgage(0)
+                      setMaxMortgage(0)
                       setMinCashFlow(0)
-                      setMinHoa(0); setMaxHoa(0)
+                      setMinHoa(0)
+                      setMaxHoa(0)
                     }}
                     className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
                   >
@@ -495,130 +376,112 @@ export default function Home() {
           <div className="lg:col-span-8">
             {viewMode === "list" ? (
               <div className="grid gap-4">
-              {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts }) => {
-  const cashFlowColor = u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
-  const quickColor =
-    quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"
+                {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts }) => {
+                  const cashFlowColor = u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
+                  const quickColor = quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"
 
-  return (
-    <Link
-      key={listing.id}
-      href={`/listing/${String(listing.id)}`}
-      className="group overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md"
-    >
-      <div className="flex flex-col sm:flex-row">
-        <div className="relative h-56 w-full sm:h-auto sm:w-72">
-          <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
+                  return (
+                    <Link
+                      key={listing.id}
+                      href={`/listing/${String(listing.id)}`}
+                      className="group overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md"
+                    >
+                      <div className="flex flex-col sm:flex-row">
+                        <div className="relative h-56 w-full sm:h-auto sm:w-72">
+                          <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
 
-          {favorites.includes(listing.id) && (
-            <div className="absolute right-3 top-3 rounded-full bg-emerald-800 px-3 py-1 text-xs font-semibold text-white">
-              Saved
-            </div>
-          )}
-        </div>
+                          {favorites.includes(listing.id) && (
+                            <div className="absolute right-3 top-3 rounded-full bg-emerald-800 px-3 py-1 text-xs font-semibold text-white">
+                              Saved
+                            </div>
+                          )}
+                        </div>
 
-        <div className="flex-1 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-lg font-semibold text-zinc-900 group-hover:underline">
-                {listing.address}, {listing.city}
-              </div>
-              <div className="mt-1 text-sm text-zinc-600">
-                {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
-              </div>
-            </div>
+                        <div className="flex-1 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-lg font-semibold text-zinc-900 group-hover:underline">
+                                {listing.address}, {listing.city}
+                              </div>
+                              <div className="mt-1 text-sm text-zinc-600">
+                                {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
+                              </div>
+                            </div>
 
-            {/* smaller save */}
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                const next = toggleFavorite(listing.id)
-                setFavorites(next)
-              }}
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                favorites.includes(listing.id)
-                  ? "border-emerald-800 bg-emerald-800 text-white"
-                  : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
-              }`}
-            >
-              {favorites.includes(listing.id) ? "Saved" : "Save"}
-            </button>
-          </div>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                const next = toggleFavorite(listing.id)
+                                setFavorites(next)
+                              }}
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                                favorites.includes(listing.id)
+                                  ? "border-emerald-800 bg-emerald-800 text-white"
+                                  : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
+                              }`}
+                            >
+                              {favorites.includes(listing.id) ? "Saved" : "Save"}
+                            </button>
+                          </div>
 
-          {/* Price prominent */}
-          <div className="mt-3 flex items-end justify-between">
-            <div>
-              <div className="text-xs text-zinc-600">Price</div>
-              <div className="text-2xl font-bold text-zinc-900">{fmtMoney(listing.price)}</div>
-            </div>
+                          <div className="mt-3 flex items-end justify-between">
+                            <div>
+                              <div className="text-xs text-zinc-600">Price</div>
+                              <div className="text-2xl font-bold text-zinc-900">{fmtMoney(listing.price)}</div>
+                            </div>
 
-            <div className="text-right text-xs text-zinc-500">
-              CoC {fmtPct(u.cocReturnPct)} · Cap {fmtPct(u.capRatePct)}
-            </div>
-          </div>
+                            <div className="text-right text-xs text-zinc-500">
+                              CoC {fmtPct(u.cocReturnPct)} · Cap {fmtPct(u.capRatePct)}
+                            </div>
+                          </div>
 
-          {/* Metrics strip */}
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetricCard label="Est rent" value={fmtMoney(listing.rentEstimate)} />
-            <MetricCard label="Mortgage" value={fmtMoney(u.mortgage)} />
-            <MetricCard
-              label="Rent − Mortgage"
-              value={fmtMoney(quickRentMinusMortgage)}
-              valueClass={quickColor}
-            />
-            <MetricCard
-              label="All in cash flow"
-              value={fmtMoney(u.cashFlow)}
-              valueClass={cashFlowColor}
-            />
-          </div>
+                          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            <MetricCard label="Est rent" value={fmtMoney(listing.rentEstimate)} />
+                            <MetricCard label="Mortgage" value={fmtMoney(u.mortgage)} />
+                            <MetricCard label="Rent − Mortgage" value={fmtMoney(quickRentMinusMortgage)} valueClass={quickColor} />
+                            <MetricCard label="All in cash flow" value={fmtMoney(u.cashFlow)} valueClass={cashFlowColor} />
+                          </div>
 
-          {/* Other costs (hover breakdown) */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
-              Rent ÷ Payment: {u.rentToPayment.toFixed(2)}x
-            </span>
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
+                              Rent ÷ Payment: {u.rentToPayment.toFixed(2)}x
+                            </span>
 
-            <div className="relative group">
-              <span className="cursor-default rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-zinc-700">
-                Other costs: {fmtMoney(otherCosts)}
-              </span>
-              <div className="pointer-events-none absolute left-0 top-full mt-2 z-50 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
-                <div className="text-xs font-semibold text-zinc-900">Other costs breakdown</div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
-                  <div>Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
-                  <div>HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span></div>
-                  <div>Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span></div>
-                  <div>Management: <span className="font-semibold">{fmtMoney(u.management)}</span></div>
-                  <div>Maintenance: <span className="font-semibold">{fmtMoney(u.maintenance)}</span></div>
-                </div>
-                <div className="mt-2 border-t pt-2">
-                  Total: <span className="font-semibold">{fmtMoney(otherCosts)}</span>
-                </div>
-              </div>
-            </div>
+                            <div className="relative group">
+                              <span className="cursor-default rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-zinc-700">
+                                Other costs: {fmtMoney(otherCosts)}
+                              </span>
+                              <div className="pointer-events-none absolute left-0 top-full mt-2 z-50 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
+                                <div className="text-xs font-semibold text-zinc-900">Other costs breakdown</div>
+                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                  <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
+                                  <div>Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
+                                  <div>HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span></div>
+                                  <div>Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span></div>
+                                  <div>Management: <span className="font-semibold">{fmtMoney(u.management)}</span></div>
+                                  <div>Maintenance: <span className="font-semibold">{fmtMoney(u.maintenance)}</span></div>
+                                </div>
+                                <div className="mt-2 border-t pt-2">
+                                  Total: <span className="font-semibold">{fmtMoney(otherCosts)}</span>
+                                </div>
+                              </div>
+                            </div>
 
-            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
-              HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo
-            </span>
-          </div>
-        </div>
-      </div>
-    </Link>
-  )
-})}
-
+                            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
+                              HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
               </div>
             ) : (
               <div className="grid gap-4 lg:grid-cols-12">
                 <div className="lg:col-span-7">
-                  <ListingMap
-                    points={mapPoints}
-                    selectedId={selectedId}
-                    onSelect={(id) => setSelectedId(id)}
-                  />
+                  <ListingMap points={mapPoints} selectedId={selectedId} onSelect={(id) => setSelectedId(id)} />
                   {!selectedId && (
                     <div className="mt-2 text-xs text-zinc-600">
                       Pins show all filtered listings. Click a pin or listing to focus.
@@ -633,7 +496,9 @@ export default function Home() {
                       <div
                         key={listing.id}
                         className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition ${
-                          isSelected ? "border-emerald-800 ring-2 ring-emerald-100" : "border-emerald-100 hover:border-emerald-200"
+                          isSelected
+                            ? "border-emerald-800 ring-2 ring-emerald-100"
+                            : "border-emerald-100 hover:border-emerald-200"
                         }`}
                         onClick={() => setSelectedId(listing.id)}
                       >
@@ -703,4 +568,3 @@ function MetricCard(props: { label: string; value: string; valueClass?: string }
     </div>
   )
 }
-
