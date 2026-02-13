@@ -442,10 +442,53 @@ export default function Home() {
                             <MetricCard label="Rent − Mortgage" value={fmtMoney(quickRentMinusMortgage)} valueClass={quickColor} />
                             <div className="relative group cursor-help">
                             <MetricCard
-                              label="All in cash flow"
-                              value={fmtMoney(u.cashFlow)}
-                              valueClass={cashFlowColor}
-                            />
+                            label="All in cash flow"
+                            value={fmtMoney(u.cashFlow)}
+                            valueClass={cashFlowColor}
+                            hoverTitle="All in cash flow"
+                            hoverBody={
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                                  <div>Rent</div>
+                                  <div className="text-right font-semibold">{fmtMoney(listing.rentEstimate)}</div>
+                          
+                                  <div>Mortgage</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.mortgage)}</div>
+                          
+                                  <div>Taxes</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.taxesMonthly)}</div>
+                          
+                                  <div>Insurance</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.insuranceMonthly)}</div>
+                          
+                                  <div>HOA</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.hoaMonthly)}</div>
+                          
+                                  <div>Vacancy</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.vacancy)}</div>
+                          
+                                  <div>Management</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.management)}</div>
+                          
+                                  <div>Maintenance</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.maintenance)}</div>
+                                </div>
+                          
+                                <div className="border-t pt-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs font-semibold text-zinc-900">Cash flow</div>
+                                    <div className={`text-xs font-bold ${u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                                      {fmtMoney(u.cashFlow)}
+                                    </div>
+                                  </div>
+                                  <div className="mt-1 text-[10px] text-zinc-500">
+                                    Cash flow = Rent − (Mortgage + Taxes + Insurance + HOA + Vacancy + Management + Maintenance)
+                                  </div>
+                                </div>
+                              </div>
+                            }
+                          />
+
   <div className="pointer-events-none absolute left-1/2 top-full z-50 hidden w-[320px] -translate-x-1/2 rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
     <div className="text-xs font-semibold text-zinc-900">
       All in cash flow
@@ -482,25 +525,39 @@ export default function Home() {
                               Rent ÷ Payment: {u.rentToPayment.toFixed(2)}x
                             </span>
 
-                            <div className="relative group">
+                           <div className="relative group">
                               <span className="cursor-default rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-zinc-700">
                                 Other costs: {fmtMoney(otherCosts)}
                               </span>
-                              <div className="pointer-events-none absolute left-0 top-full mt-2 z-50 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
+                            
+                              <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
                                 <div className="text-xs font-semibold text-zinc-900">Other costs breakdown</div>
                                 <div className="mt-2 grid grid-cols-2 gap-2">
-                                  <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
-                                  <div>Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
-                                  <div>HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span></div>
-                                  <div>Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span></div>
-                                  <div>Management: <span className="font-semibold">{fmtMoney(u.management)}</span></div>
-                                  <div>Maintenance: <span className="font-semibold">{fmtMoney(u.maintenance)}</span></div>
+                                  <div>
+                                    Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span>
+                                  </div>
+                                  <div>
+                                    Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span>
+                                  </div>
+                                  <div>
+                                    HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span>
+                                  </div>
+                                  <div>
+                                    Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span>
+                                  </div>
+                                  <div>
+                                    Management: <span className="font-semibold">{fmtMoney(u.management)}</span>
+                                  </div>
+                                  <div>
+                                    Maintenance: <span className="font-semibold">{fmtMoney(u.maintenance)}</span>
+                                  </div>
                                 </div>
                                 <div className="mt-2 border-t pt-2">
                                   Total: <span className="font-semibold">{fmtMoney(otherCosts)}</span>
                                 </div>
                               </div>
                             </div>
+
 
                             <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
                               HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo
@@ -592,13 +649,35 @@ export default function Home() {
   )
 }
 
-function MetricCard(props: { label: string; value: string; valueClass?: string }) {
+function MetricCard(props: {
+  label: string
+  value: string
+  valueClass?: string
+  hoverTitle?: string
+  hoverBody?: React.ReactNode
+}) {
+  const hasHover = Boolean(props.hoverBody)
+
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3">
-      <div className="text-xs text-zinc-600">{props.label}</div>
-      <div className={`mt-1 text-sm font-semibold ${props.valueClass ?? "text-zinc-900"}`}>
-        {props.value}
+    <div className="relative">
+      <div
+        className={`rounded-lg border border-zinc-200 bg-white p-3 ${
+          hasHover ? "group cursor-default" : ""
+        }`}
+      >
+        <div className="text-xs text-zinc-600">{props.label}</div>
+        <div className={`mt-1 text-sm font-semibold ${props.valueClass ?? "text-zinc-900"}`}>
+          {props.value}
+        </div>
+
+        {hasHover && (
+          <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-[340px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
+            <div className="text-xs font-semibold text-zinc-900">{props.hoverTitle ?? props.label}</div>
+            <div className="mt-2">{props.hoverBody}</div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
+
