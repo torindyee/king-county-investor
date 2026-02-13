@@ -489,7 +489,7 @@ export default function Home() {
                             }
                           />
 
-  <div className="pointer-events-none absolute left-1/2 top-full z-50 hidden w-[320px] -translate-x-1/2 rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
+  <div className="pointer-events-auto absolute left-1/2 top-full z-50 hidden w-[320px] -translate-x-1/2 rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
     <div className="text-xs font-semibold text-zinc-900">
       All in cash flow
     </div>
@@ -530,7 +530,7 @@ export default function Home() {
                                 Other costs: {fmtMoney(otherCosts)}
                               </span>
                             
-                              <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
+                              <div className="pointer-events-auto absolute left-0 top-full z-50 mt-2 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
                                 <div className="text-xs font-semibold text-zinc-900">Other costs breakdown</div>
                                 <div className="mt-2 grid grid-cols-2 gap-2">
                                   <div>
@@ -671,7 +671,7 @@ function MetricCard(props: {
         </div>
 
         {hasHover && (
-          <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-[340px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
+          <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden w-[340px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
             <div className="text-xs font-semibold text-zinc-900">{props.hoverTitle ?? props.label}</div>
             <div className="mt-2">{props.hoverBody}</div>
           </div>
