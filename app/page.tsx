@@ -191,7 +191,7 @@ export default function Home() {
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Left panel */}
           <div className="lg:col-span-4">
-            <div className="sticky top-6 space-y-4">
+            <div className="sticky top-6 max-h-[calc(100vh-2rem)] overflow-y-auto pr-3 space-y-4 overscroll-contain">
               {/* View + sort */}
               <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between">
