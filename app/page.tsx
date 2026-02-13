@@ -440,7 +440,41 @@ export default function Home() {
                             <MetricCard label="Est rent" value={fmtMoney(listing.rentEstimate)} />
                             <MetricCard label="Mortgage" value={fmtMoney(u.mortgage)} />
                             <MetricCard label="Rent − Mortgage" value={fmtMoney(quickRentMinusMortgage)} valueClass={quickColor} />
-                            <MetricCard label="All in cash flow" value={fmtMoney(u.cashFlow)} valueClass={cashFlowColor} />
+                            <div className="relative group cursor-help">
+                            <MetricCard
+                              label="All in cash flow"
+                              value={fmtMoney(u.cashFlow)}
+                              valueClass={cashFlowColor}
+                            />
+  <div className="pointer-events-none absolute left-1/2 top-full z-50 hidden w-[320px] -translate-x-1/2 rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
+    <div className="text-xs font-semibold text-zinc-900">
+      All in cash flow
+    </div>
+
+    <div className="mt-1 text-[11px] text-zinc-600">
+      Rent minus mortgage, taxes, insurance, HOA, vacancy, management, and maintenance.
+    </div>
+
+    <div className="mt-2 grid grid-cols-2 gap-2">
+      <div>Rent: <span className="font-semibold">{fmtMoney(listing.rentEstimate)}</span></div>
+      <div>Mortgage: <span className="font-semibold">{fmtMoney(u.mortgage)}</span></div>
+      <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
+      <div>Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
+      <div>HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span></div>
+      <div>Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span></div>
+      <div>Mgmt: <span className="font-semibold">{fmtMoney(u.management)}</span></div>
+      <div>Maint: <span className="font-semibold">{fmtMoney(u.maintenance)}</span></div>
+    </div>
+
+    <div className="mt-2 border-t pt-2">
+      Cash flow:
+      <span className={`ml-1 font-semibold ${cashFlowColor}`}>
+        {fmtMoney(u.cashFlow)}
+      </span>
+    </div>
+  </div>
+</div>
+
                           </div>
 
                           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
