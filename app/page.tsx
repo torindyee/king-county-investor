@@ -70,11 +70,7 @@ function NumberField(props: {
 }
 
 // Leaflet Map (CDN) — no installs
-function ListingMap(props: {
-  points: { id: number; lat: number; lng: number; label: string }[]
-  selectedId: number | null
-  onSelect: (id: number) => void
-}) {
+ {
   const mapDivRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<any>(null)
   const markersLayerRef = useRef<any>(null)
