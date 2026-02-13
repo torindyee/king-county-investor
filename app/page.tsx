@@ -384,12 +384,12 @@ export default function Home() {
                     <Link
                       key={listing.id}
                       href={`/listing/${String(listing.id)}`}
-                      className="group overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md"
+                      className="group rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md"
                     >
-                      <div className="flex flex-col sm:flex-row">
-                        <div className="relative h-56 w-full sm:h-auto sm:w-72">
-                          <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
 
+                      <div className="flex flex-col sm:flex-row">
+                        <div className="relative h-56 w-full overflow-hidden rounded-t-xl sm:h-auto sm:w-72 sm:rounded-l-xl sm:rounded-tr-none">
+                          <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
                           {favorites.includes(listing.id) && (
                             <div className="absolute right-3 top-3 rounded-full bg-emerald-800 px-3 py-1 text-xs font-semibold text-white">
                               Saved
