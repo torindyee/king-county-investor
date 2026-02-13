@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { LISTINGS } from "./lib/listings"
+import ListingMap from "./ListingMap"
 import { Scenario, fmtMoney, fmtPct, underwriting } from "./lib/finance"
 import { getFavorites, toggleFavorite } from "./lib/favorites"
 
