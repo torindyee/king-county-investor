@@ -11,8 +11,11 @@ export default function ListingMap(props: {
 }) {
   const mapDivRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<any>(null)
-  const markersRef = useRef<any[]>([])
+  const layerRef = useRef<any>(null)
   const [tileError, setTileError] = useState(false)
+
+  // Track whether the user has manually moved the map so we don't constantly refit bounds.
+  const userMovedRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +55,14 @@ export default function ListingMap(props: {
 
         tiles.on("tileerror", () => setTileError(true))
         tiles.addTo(map)
+
+        // Selection layer
+        layerRef.current = L.layerGroup().addTo(map)
+
+        // If user pans/zooms, don't keep snapping back on every filter change.
+        map.on("movestart", () => {
+          userMovedRef.current = true
+        })
       }
     }
 
@@ -62,44 +73,56 @@ export default function ListingMap(props: {
     }
   }, [])
 
-  const center = useMemo(() => {
-    if (props.points.length === 0) return { lat: 47.6062, lng: -122.3321 }
-    return { lat: props.points[0].lat, lng: props.points[0].lng }
-  }, [props.points])
+  const defaultCenter = useMemo(() => ({ lat: 47.6062, lng: -122.3321 }), [])
 
   useEffect(() => {
     const L = (window as any).L
     const map = mapRef.current
-    if (!L || !map) return
+    const layer = layerRef.current
+    if (!L || !map || !layer) return
 
-    markersRef.current.forEach((m) => m.remove())
-    markersRef.current = []
+    layer.clearLayers()
 
+    // If no points, show a reasonable default view.
     if (props.points.length === 0) {
-      map.setView([center.lat, center.lng], 10)
+      map.setView([defaultCenter.lat, defaultCenter.lng], 10)
       return
     }
 
-    const bounds = L.latLngBounds(props.points.map((p: Point) => [p.lat, p.lng]))
-    map.fitBounds(bounds, { padding: [40, 40] })
-
+    // Draw markers (circle markers so we can visually highlight selected)
     props.points.forEach((p) => {
-      const marker = L.marker([p.lat, p.lng]).addTo(map)
+      const isSelected = props.selectedId === p.id
+
+      const marker = L.circleMarker([p.lat, p.lng], {
+        radius: isSelected ? 10 : 7,
+        weight: isSelected ? 3 : 2,
+        opacity: 1,
+        fillOpacity: 0.9,
+      })
+
       marker.on("click", () => props.onSelect(p.id))
-      markersRef.current.push(marker)
+      marker.addTo(layer)
     })
-  }, [props.points, props.onSelect, center.lat, center.lng])
+
+    // Fit bounds only when:
+    // - there is NO selection
+    // - and the user hasn't manually moved the map yet
+    if (props.selectedId == null && !userMovedRef.current) {
+      const bounds = L.latLngBounds(props.points.map((p: Point) => [p.lat, p.lng]))
+      map.fitBounds(bounds, { padding: [40, 40] })
+    }
+  }, [props.points, props.selectedId, props.onSelect, defaultCenter.lat, defaultCenter.lng])
 
   useEffect(() => {
-    const L = (window as any).L
     const map = mapRef.current
-    if (!L || !map) return
+    if (!map) return
     if (props.selectedId == null) return
 
     const selected = props.points.find((p) => p.id === props.selectedId)
     if (!selected) return
 
-    map.setView([selected.lat, selected.lng], Math.max(map.getZoom(), 12))
+    // When user selects, we DO move the map (intentional).
+    map.setView([selected.lat, selected.lng], Math.max(map.getZoom(), 12), { animate: true })
   }, [props.selectedId, props.points])
 
   return (
