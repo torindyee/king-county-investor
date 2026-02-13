@@ -584,11 +584,10 @@ export default function Home() {
             </span>
 
             <div className="relative group">
-              <span className="cursor-default rounded-full border border-emerald-100 bg-emerald-50/60 px-3 py-1 text-emerald-900">
+              <span className="cursor-default rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-zinc-700">
                 Other costs: {fmtMoney(otherCosts)}
               </span>
-
-              <div className="pointer-events-none absolute left-0 top-full mt-2 z-20 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-lg group-hover:block">
+              <div className="pointer-events-none absolute left-0 top-full mt-2 z-50 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
                 <div className="text-xs font-semibold text-zinc-900">Other costs breakdown</div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
@@ -701,7 +700,7 @@ function MetricCard(props: { label: string; value: string; valueClass?: string }
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-3">
       <div className="text-xs text-zinc-600">{props.label}</div>
-      <div className={`mt-1 text-sm font-semibold text-zinc-900 ${props.valueClass ?? ""}`}>
+      <div className={`mt-1 text-sm font-semibold ${props.valueClass ?? "text-zinc-900"}`}>
         {props.value}
       </div>
     </div>
