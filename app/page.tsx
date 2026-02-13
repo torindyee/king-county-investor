@@ -60,7 +60,7 @@ function NumberField(props: {
       <div className="text-xs font-medium text-zinc-600">{props.label}</div>
       <input
         inputMode="numeric"
-        value={props.value ? props.value : ""}
+        value={Number.isFinite(props.value) && props.value !== 0 ? props.value : (props.value === 0 ? 0 : "")}
         placeholder={props.placeholder}
         onChange={(e) => props.onChange(Number(e.target.value))}
         className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
