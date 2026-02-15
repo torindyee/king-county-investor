@@ -155,6 +155,8 @@ function RangeSlider(props: {
   const safeMin = Math.min(minV, maxV)
   const safeMax = Math.max(maxV, minV)
 
+  const thumbsTouching = safeMax - safeMin <= props.step
+  
   const range = props.max - props.min
   const leftPct = range === 0 ? 0 : ((safeMin - props.min) / range) * 100
   const rightPct = range === 0 ? 0 : ((safeMax - props.min) / range) * 100
@@ -182,34 +184,38 @@ function RangeSlider(props: {
         />
 
         {/* Min thumb input */}
-        <input
-          type="range"
-          min={props.min}
-          max={props.max}
-          step={props.step}
-          value={safeMin}
-          onChange={(e) => {
-            const nextMin = Number(e.target.value)
-            props.onChange(Math.min(nextMin, safeMax), safeMax)
-          }}
-          className="range-thumb absolute inset-0 z-20 w-full appearance-none bg-transparent"
-          aria-label={`${props.label} min`}
-        />
-
-        {/* Max thumb input */}
-        <input
-          type="range"
-          min={props.min}
-          max={props.max}
-          step={props.step}
-          value={safeMax}
-          onChange={(e) => {
-            const nextMax = Number(e.target.value)
-            props.onChange(safeMin, Math.max(nextMax, safeMin))
-          }}
-          className="range-thumb absolute inset-0 z-10 w-full appearance-none bg-transparent"
-          aria-label={`${props.label} max`}
-        />
+          <input
+            type="range"
+            min={props.min}
+            max={props.max}
+            step={props.step}
+            value={safeMin}
+            onChange={(e) => {
+              const nextMin = Number(e.target.value)
+              props.onChange(Math.min(nextMin, safeMax), safeMax)
+            }}
+            className={`range-thumb absolute inset-0 w-full appearance-none bg-transparent ${
+              thumbsTouching ? "z-20" : "z-10"
+            }`}
+            aria-label={`${props.label} min`}
+          />
+          
+          {/* Max thumb input */}
+          <input
+            type="range"
+            min={props.min}
+            max={props.max}
+            step={props.step}
+            value={safeMax}
+            onChange={(e) => {
+              const nextMax = Number(e.target.value)
+              props.onChange(safeMin, Math.max(nextMax, safeMin))
+            }}
+            className={`range-thumb absolute inset-0 w-full appearance-none bg-transparent ${
+              thumbsTouching ? "z-10" : "z-20"
+            }`}
+            aria-label={`${props.label} max`}
+          />
       </div>
 
       <div className="flex items-center justify-between text-[11px] text-zinc-500">
