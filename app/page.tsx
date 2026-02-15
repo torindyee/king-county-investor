@@ -1,13 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { LISTINGS } from "./lib/listings"
 import ListingMap from "./ListingMap"
 import { Scenario, fmtMoney, fmtPct, underwriting } from "./lib/finance"
 import { getFavorites, toggleFavorite } from "./lib/favorites"
 
 type SortKey = "cashFlow" | "coc" | "cap" | "rentToPayment" | "price" | "rent"
+type DownPaymentMode = "percent" | "amount"
 
 const DEFAULT_SCENARIO: Scenario = {
   downPaymentPct: 0.25,
@@ -19,6 +20,107 @@ const DEFAULT_SCENARIO: Scenario = {
   vacancyPct: 0.06,
   managementPct: 0.08,
   maintenancePct: 0.07,
+}
+
+/** ---------- Small UI helpers ---------- */
+
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ")
+}
+
+function PanelShell(props: {
+  title: string
+  right?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-xl border border-emerald-100 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+        <div className="text-sm font-semibold text-zinc-900">{props.title}</div>
+        {props.right}
+      </div>
+      <div className="p-4">{props.children}</div>
+    </div>
+  )
+}
+
+function Chip(props: { label: string; onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs text-zinc-700 hover:border-emerald-200 hover:bg-emerald-50"
+    >
+      {props.label}
+    </button>
+  )
+}
+
+function PrimaryButton(props: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      className="rounded-md bg-emerald-800 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-900"
+    >
+      {props.children}
+    </button>
+  )
+}
+
+function GhostButton(props: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+    >
+      {props.children}
+    </button>
+  )
+}
+
+function NumberField(props: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+  placeholder?: string
+  suffix?: string
+  smallHint?: string
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium text-zinc-600">{props.label}</div>
+        {props.smallHint && <div className="text-[11px] text-zinc-500">{props.smallHint}</div>}
+      </div>
+
+      <div className="relative">
+        <input
+          type="number"
+          inputMode="numeric"
+          value={
+            Number.isFinite(props.value) && props.value !== 0
+              ? props.value
+              : props.value === 0
+                ? 0
+                : ""
+          }
+          placeholder={props.placeholder}
+          onChange={(e) => props.onChange(Number(e.target.value))}
+          className={cn(
+            "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 pr-10 text-sm outline-none",
+            "focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+          )}
+        />
+        {props.suffix && (
+          <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
+            {props.suffix}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function SliderRow(props: {
@@ -49,31 +151,7 @@ function SliderRow(props: {
   )
 }
 
-function NumberField(props: {
-  label: string
-  value: number
-  onChange: (v: number) => void
-  placeholder?: string
-}) {
-  return (
-    <div className="space-y-1">
-      <div className="text-xs font-medium text-zinc-600">{props.label}</div>
-      <input
-        inputMode="numeric"
-        value={
-          Number.isFinite(props.value) && props.value !== 0
-            ? props.value
-            : props.value === 0
-              ? 0
-              : ""
-        }
-        placeholder={props.placeholder}
-        onChange={(e) => props.onChange(Number(e.target.value))}
-        className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-      />
-    </div>
-  )
-}
+/** ---------- Main page ---------- */
 
 export default function Home() {
   const [scenario, setScenario] = useState<Scenario>(DEFAULT_SCENARIO)
@@ -84,6 +162,10 @@ export default function Home() {
   const [favorites, setFavorites] = useState<number[]>([])
   const [onlyFavorites, setOnlyFavorites] = useState(false)
 
+  const [showFilters, setShowFilters] = useState(true)
+  const [showAssumptions, setShowAssumptions] = useState(false)
+
+  // Filters
   const [minPrice, setMinPrice] = useState(0)
   const [maxPrice, setMaxPrice] = useState(0)
   const [minRent, setMinRent] = useState(0)
@@ -94,9 +176,42 @@ export default function Home() {
   const [minHoa, setMinHoa] = useState(0)
   const [maxHoa, setMaxHoa] = useState(0)
 
+  // Down payment: percent or amount, but we keep scenario.downPaymentPct as the single source of truth
+  const [dpMode, setDpMode] = useState<DownPaymentMode>("percent")
+  const [dpInput, setDpInput] = useState(Math.round(DEFAULT_SCENARIO.downPaymentPct * 100))
+
   useEffect(() => {
     setFavorites(getFavorites())
   }, [])
+
+  const basePriceForDownPayment = useMemo(() => {
+    // Use median listing price as the reference for showing % <-> $ conversion.
+    const prices = LISTINGS.map((l) => l.price).slice().sort((a, b) => a - b)
+    const mid = Math.floor(prices.length / 2)
+    return prices.length % 2 === 0 ? Math.round((prices[mid - 1] + prices[mid]) / 2) : prices[mid]
+  }, [])
+
+  // Keep dpInput and scenario.downPaymentPct in sync
+  useEffect(() => {
+    if (dpMode === "percent") {
+      const pct = dpInput / 100
+      if (Number.isFinite(pct) && pct > 0) setScenario((s) => ({ ...s, downPaymentPct: pct }))
+    } else {
+      const pct = dpInput / basePriceForDownPayment
+      if (Number.isFinite(pct) && pct > 0) setScenario((s) => ({ ...s, downPaymentPct: pct }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dpInput, dpMode, basePriceForDownPayment])
+
+  // If scenario changes (reset), reflect into dpInput
+  useEffect(() => {
+    if (dpMode === "percent") {
+      setDpInput(Math.round(scenario.downPaymentPct * 100))
+    } else {
+      setDpInput(Math.round(scenario.downPaymentPct * basePriceForDownPayment))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenario.downPaymentPct])
 
   const rows = useMemo(() => {
     const computed = LISTINGS.map((l) => {
@@ -104,36 +219,19 @@ export default function Home() {
       const u = underwriting({ price: l.price, rentMonthly: l.rentEstimate, scenario: s })
 
       const quickRentMinusMortgage = l.rentEstimate - u.mortgage
-      const otherCosts =
-        u.taxesMonthly +
-        u.insuranceMonthly +
-        u.hoaMonthly +
-        u.vacancy +
-        u.management +
-        u.maintenance
+      const otherCosts = u.taxesMonthly + u.insuranceMonthly + u.hoaMonthly + u.vacancy + u.management + u.maintenance
 
       return { listing: l, u, quickRentMinusMortgage, otherCosts }
     })
 
     const filtered = computed.filter(({ listing, u }) => {
-      const priceOk =
-        (minPrice ? listing.price >= minPrice : true) &&
-        (maxPrice ? listing.price <= maxPrice : true)
-
-      const rentOk =
-        (minRent ? listing.rentEstimate >= minRent : true) &&
-        (maxRent ? listing.rentEstimate <= maxRent : true)
-
-      const mortgageOk =
-        (minMortgage ? u.mortgage >= minMortgage : true) &&
-        (maxMortgage ? u.mortgage <= maxMortgage : true)
-
+      const priceOk = (minPrice ? listing.price >= minPrice : true) && (maxPrice ? listing.price <= maxPrice : true)
+      const rentOk = (minRent ? listing.rentEstimate >= minRent : true) && (maxRent ? listing.rentEstimate <= maxRent : true)
+      const mortgageOk = (minMortgage ? u.mortgage >= minMortgage : true) && (maxMortgage ? u.mortgage <= maxMortgage : true)
       const cashFlowOk = minCashFlow ? u.cashFlow >= minCashFlow : true
       const favOk = onlyFavorites ? favorites.includes(listing.id) : true
-
       const hoa = listing.hoaMonthly ?? 0
       const hoaOk = (minHoa ? hoa >= minHoa : true) && (maxHoa ? hoa <= maxHoa : true)
-
       return priceOk && rentOk && mortgageOk && cashFlowOk && hoaOk && favOk
     })
 
@@ -175,65 +273,117 @@ export default function Home() {
     }))
   }, [rows])
 
+  const activeChips = useMemo(() => {
+    const chips: Array<{ label: string; clear: () => void }> = []
+
+    if (minPrice) chips.push({ label: `Price ≥ ${fmtMoney(minPrice)}`, clear: () => setMinPrice(0) })
+    if (maxPrice) chips.push({ label: `Price ≤ ${fmtMoney(maxPrice)}`, clear: () => setMaxPrice(0) })
+
+    if (minRent) chips.push({ label: `Rent ≥ ${fmtMoney(minRent)}`, clear: () => setMinRent(0) })
+    if (maxRent) chips.push({ label: `Rent ≤ ${fmtMoney(maxRent)}`, clear: () => setMaxRent(0) })
+
+    if (minMortgage) chips.push({ label: `Mortgage ≥ ${fmtMoney(minMortgage)}`, clear: () => setMinMortgage(0) })
+    if (maxMortgage) chips.push({ label: `Mortgage ≤ ${fmtMoney(maxMortgage)}`, clear: () => setMaxMortgage(0) })
+
+    if (minHoa) chips.push({ label: `HOA ≥ ${fmtMoney(minHoa)}`, clear: () => setMinHoa(0) })
+    if (maxHoa) chips.push({ label: `HOA ≤ ${fmtMoney(maxHoa)}`, clear: () => setMaxHoa(0) })
+
+    if (minCashFlow) chips.push({ label: `Cash flow ≥ ${fmtMoney(minCashFlow)}`, clear: () => setMinCashFlow(0) })
+    if (onlyFavorites) chips.push({ label: `Favorites only`, clear: () => setOnlyFavorites(false) })
+
+    return chips
+  }, [minPrice, maxPrice, minRent, maxRent, minMortgage, maxMortgage, minHoa, maxHoa, minCashFlow, onlyFavorites])
+
+  function clearAllFilters() {
+    setMinPrice(0)
+    setMaxPrice(0)
+    setMinRent(0)
+    setMaxRent(0)
+    setMinMortgage(0)
+    setMaxMortgage(0)
+    setMinCashFlow(0)
+    setMinHoa(0)
+    setMaxHoa(0)
+    setOnlyFavorites(false)
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-white to-zinc-50">
       <div className="mx-auto max-w-7xl px-6 py-8">
+        {/* Header */}
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
-            King County Investment Finder
-          </h1>
-          <p className="text-sm text-zinc-700">
-            Compare rent vs mortgage fast, then see true all in cash flow with realistic assumptions.
-          </p>
-          <p className="text-xs text-zinc-500">{favorites.length} saved properties</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-zinc-900">King County Investment Finder</h1>
+              <p className="mt-1 text-sm text-zinc-700">
+                Scan deals fast. Sort by performance. Use assumptions to model your strategy.
+              </p>
+              <p className="mt-1 text-xs text-zinc-500">{favorites.length} saved properties</p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex overflow-hidden rounded-md border border-emerald-100 bg-white">
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={cn("px-3 py-2 text-sm", viewMode === "list" ? "bg-emerald-800 text-white" : "text-zinc-700")}
+                >
+                  List
+                </button>
+                <button
+                  onClick={() => setViewMode("map")}
+                  className={cn("px-3 py-2 text-sm", viewMode === "map" ? "bg-emerald-800 text-white" : "text-zinc-700")}
+                >
+                  Map
+                </button>
+              </div>
+
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+              >
+                <option value="cashFlow">Sort: Cash flow</option>
+                <option value="coc">Sort: Cash-on-cash</option>
+                <option value="cap">Sort: Cap rate</option>
+                <option value="rentToPayment">Sort: Rent ÷ Payment</option>
+                <option value="price">Sort: Price</option>
+                <option value="rent">Sort: Rent</option>
+              </select>
+
+              <GhostButton onClick={() => setShowFilters((v) => !v)}>
+                {showFilters ? "Hide filters" : "Show filters"}
+              </GhostButton>
+
+              <GhostButton onClick={() => setShowAssumptions((v) => !v)}>
+                {showAssumptions ? "Hide assumptions" : "Assumptions"}
+              </GhostButton>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* Left panel */}
-          <div className="lg:col-span-4">
-          <div className="sticky top-6 max-h-[calc(100vh-2rem)] overflow-y-auto pr-3 space-y-4 overscroll-contain">
-              {/* View + sort */}
-              <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-zinc-900">View</div>
-
-                  <div className="flex overflow-hidden rounded-md border border-emerald-100 bg-white">
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={`px-3 py-2 text-sm ${
-                        viewMode === "list" ? "bg-emerald-800 text-white" : "text-zinc-700"
-                      }`}
-                    >
-                      List
-                    </button>
-                    <button
-                      onClick={() => setViewMode("map")}
-                      className={`px-3 py-2 text-sm ${
-                        viewMode === "map" ? "bg-emerald-800 text-white" : "text-zinc-700"
-                      }`}
-                    >
-                      Map
-                    </button>
+        {/* Sticky controls + panels */}
+        <div className="sticky top-4 z-30 mt-6 space-y-4">
+          {/* Active chips */}
+          <div className="rounded-xl border border-emerald-100 bg-white p-3 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-xs font-semibold text-zinc-700">
+                  Showing {rows.length} result{rows.length === 1 ? "" : "s"}
+                </div>
+                {activeChips.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {activeChips.map((c) => (
+                      <Chip key={c.label} label={`✕ ${c.label}`} onClick={c.clear} />
+                    ))}
                   </div>
-                </div>
+                )}
+                {activeChips.length === 0 && (
+                  <div className="text-xs text-zinc-500">No filters applied</div>
+                )}
+              </div>
 
-                <div className="mt-4 flex items-center justify-between gap-2">
-                  <div className="text-xs text-zinc-600">Sort</div>
-                  <select
-                    value={sortKey}
-                    onChange={(e) => setSortKey(e.target.value as SortKey)}
-                    className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  >
-                    <option value="cashFlow">Cash flow</option>
-                    <option value="coc">Cash-on-cash</option>
-                    <option value="cap">Cap rate</option>
-                    <option value="rentToPayment">Rent ÷ Payment</option>
-                    <option value="price">Price</option>
-                    <option value="rent">Rent</option>
-                  </select>
-                </div>
-
-                <label className="mt-4 flex items-center gap-2 text-sm text-zinc-700">
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 text-sm text-zinc-700">
                   <input
                     type="checkbox"
                     checked={onlyFavorites}
@@ -242,41 +392,109 @@ export default function Home() {
                   />
                   Favorites only
                 </label>
+                <GhostButton onClick={clearAllFilters}>Clear all</GhostButton>
+              </div>
+            </div>
+          </div>
+
+          {showFilters && (
+            <PanelShell
+              title="Filters"
+              right={
+                <button
+                  onClick={clearAllFilters}
+                  className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+                >
+                  Clear
+                </button>
+              }
+            >
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <NumberField label="Price min" value={minPrice} onChange={setMinPrice} placeholder="e.g. 600000" />
+                <NumberField label="Price max" value={maxPrice} onChange={setMaxPrice} placeholder="e.g. 900000" />
+
+                <NumberField label="Rent min" value={minRent} onChange={setMinRent} placeholder="e.g. 3000" />
+                <NumberField label="Rent max" value={maxRent} onChange={setMaxRent} placeholder="e.g. 5500" />
+
+                <NumberField label="HOA min" value={minHoa} onChange={setMinHoa} placeholder="e.g. 0" />
+                <NumberField label="HOA max" value={maxHoa} onChange={setMaxHoa} placeholder="e.g. 600" />
+
+                <NumberField label="Mortgage min" value={minMortgage} onChange={setMinMortgage} placeholder="e.g. 2500" />
+                <NumberField label="Mortgage max" value={maxMortgage} onChange={setMaxMortgage} placeholder="e.g. 4500" />
+
+                <div className="sm:col-span-2">
+                  <NumberField label="Cash flow min" value={minCashFlow} onChange={setMinCashFlow} placeholder="e.g. 200" />
+                </div>
+              </div>
+            </PanelShell>
+          )}
+
+          {showAssumptions && (
+            <PanelShell
+              title="Assumptions"
+              right={
+                <button
+                  onClick={() => setScenario(DEFAULT_SCENARIO)}
+                  className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+                >
+                  Reset
+                </button>
+              }
+            >
+              {/* Rate + DP as typed fields */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <NumberField
+                  label="Interest rate"
+                  value={scenario.interestRatePct}
+                  onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
+                  placeholder="e.g. 6.75"
+                  suffix="%"
+                />
+
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-medium text-zinc-600">Down payment</div>
+                    <button
+                      onClick={() => setDpMode((m) => (m === "percent" ? "amount" : "percent"))}
+                      className="text-[11px] font-semibold text-emerald-800 underline"
+                    >
+                      Use {dpMode === "percent" ? "$ amount" : "%"}
+                    </button>
+                  </div>
+
+                  <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <NumberField
+                      label={dpMode === "percent" ? "Percent" : "Amount"}
+                      value={dpInput}
+                      onChange={setDpInput}
+                      placeholder={dpMode === "percent" ? "e.g. 20" : "e.g. 150000"}
+                      suffix={dpMode === "percent" ? "%" : "$"}
+                      smallHint={
+                        dpMode === "percent"
+                          ? `≈ ${fmtMoney(basePriceForDownPayment * (dpInput / 100))} on ${fmtMoney(basePriceForDownPayment)}`
+                          : `≈ ${((dpInput / basePriceForDownPayment) * 100).toFixed(1)}% on ${fmtMoney(basePriceForDownPayment)}`
+                      }
+                    />
+
+                    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                      <div className="text-xs font-medium text-zinc-700">Current assumption</div>
+                      <div className="mt-1 text-sm font-semibold text-zinc-900">
+                        {Math.round(scenario.downPaymentPct * 100)}%
+                        <span className="ml-2 text-xs font-medium text-zinc-500">
+                          (≈ {fmtMoney(scenario.downPaymentPct * basePriceForDownPayment)} on {fmtMoney(basePriceForDownPayment)})
+                        </span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-zinc-500">
+                        We use this % across listings for underwriting.
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Assumptions */}
-              <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-zinc-900">Assumptions</div>
-                  <button
-                    onClick={() => setScenario(DEFAULT_SCENARIO)}
-                    className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
-                  >
-                    Reset
-                  </button>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <SliderRow
-                    label="Interest rate"
-                    valueLabel={`${scenario.interestRatePct.toFixed(2)}%`}
-                    min={3}
-                    max={10}
-                    step={0.05}
-                    value={scenario.interestRatePct}
-                    onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
-                  />
-
-                  <SliderRow
-                    label="Down payment"
-                    valueLabel={`${Math.round(scenario.downPaymentPct * 100)}%`}
-                    min={5}
-                    max={40}
-                    step={1}
-                    value={Math.round(scenario.downPaymentPct * 100)}
-                    onChange={(v) => setScenario({ ...scenario, downPaymentPct: v / 100 })}
-                  />
-
+              {/* The rest stay as sliders (fast tuning) */}
+              <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div className="space-y-4">
                   <SliderRow
                     label="Property tax rate (annual)"
                     valueLabel={`${scenario.propertyTaxRatePct.toFixed(2)}%`}
@@ -286,7 +504,6 @@ export default function Home() {
                     value={scenario.propertyTaxRatePct}
                     onChange={(v) => setScenario({ ...scenario, propertyTaxRatePct: v })}
                   />
-
                   <SliderRow
                     label="Insurance (monthly)"
                     valueLabel={fmtMoney(scenario.insuranceMonthly)}
@@ -296,13 +513,10 @@ export default function Home() {
                     value={scenario.insuranceMonthly}
                     onChange={(v) => setScenario({ ...scenario, insuranceMonthly: v })}
                   />
+                </div>
 
-                  <div className="pt-2">
-                    <div className="border-t border-zinc-200 pt-3 text-xs font-semibold text-zinc-600">
-                      Operating reserves
-                    </div>
-                  </div>
-
+                <div className="space-y-4">
+                  <div className="text-xs font-semibold text-zinc-600">Operating reserves</div>
                   <SliderRow
                     label="Vacancy"
                     valueLabel={`${Math.round(scenario.vacancyPct * 100)}%`}
@@ -332,87 +546,50 @@ export default function Home() {
                   />
                 </div>
               </div>
+            </PanelShell>
+          )}
+        </div>
 
-              {/* Filters */}
-              <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-zinc-900">Filters</div>
-                  <button
-                    onClick={() => {
-                      setMinPrice(0)
-                      setMaxPrice(0)
-                      setMinRent(0)
-                      setMaxRent(0)
-                      setMinMortgage(0)
-                      setMaxMortgage(0)
-                      setMinCashFlow(0)
-                      setMinHoa(0)
-                      setMaxHoa(0)
-                    }}
-                    className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+        {/* Main content */}
+        <div className="mt-6">
+          {viewMode === "list" ? (
+            <div className="grid gap-4">
+              {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts }) => {
+                const isSaved = favorites.includes(listing.id)
+                const cashFlowGood = u.cashFlow >= 0
+                const cashFlowColor = cashFlowGood ? "text-emerald-700" : "text-rose-600"
+                const quickColor = quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"
+
+                return (
+                  <Link
+                    key={listing.id}
+                    href={`/listing/${String(listing.id)}`}
+                    className="group rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md overflow-visible"
                   >
-                    Clear
-                  </button>
-                </div>
+                    <div className="flex flex-col sm:flex-row">
+                      {/* Image */}
+                      <div className="relative h-48 w-full overflow-hidden rounded-t-xl sm:h-auto sm:w-64 sm:rounded-l-xl sm:rounded-tr-none">
+                        <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
+                        {isSaved && (
+                          <div className="absolute left-3 top-3 rounded-full bg-emerald-800 px-3 py-1 text-xs font-semibold text-white">
+                            Saved
+                          </div>
+                        )}
+                      </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <NumberField label="Price min" value={minPrice} onChange={setMinPrice} placeholder="e.g. 600000" />
-                  <NumberField label="Price max" value={maxPrice} onChange={setMaxPrice} placeholder="e.g. 900000" />
-
-                  <NumberField label="Rent min" value={minRent} onChange={setMinRent} placeholder="e.g. 3000" />
-                  <NumberField label="Rent max" value={maxRent} onChange={setMaxRent} placeholder="e.g. 5500" />
-
-                  <NumberField label="HOA min" value={minHoa} onChange={setMinHoa} placeholder="e.g. 0" />
-                  <NumberField label="HOA max" value={maxHoa} onChange={setMaxHoa} placeholder="e.g. 600" />
-
-                  <NumberField label="Mortgage min" value={minMortgage} onChange={setMinMortgage} placeholder="e.g. 2500" />
-                  <NumberField label="Mortgage max" value={maxMortgage} onChange={setMaxMortgage} placeholder="e.g. 4500" />
-
-                  <div className="col-span-2">
-                    <NumberField label="Cash flow min" value={minCashFlow} onChange={setMinCashFlow} placeholder="e.g. 200" />
-                  </div>
-                </div>
-
-                <div className="mt-4 text-xs text-zinc-600">{rows.length} results</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right panel */}
-          <div className="lg:col-span-8">
-            {viewMode === "list" ? (
-              <div className="grid gap-4">
-                {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts }) => {
-                  const cashFlowColor = u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
-                  const quickColor = quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"
-
-                  return (
-                    <Link
-                      key={listing.id}
-                      href={`/listing/${String(listing.id)}`}
-                      className="rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md overflow-visible"
-                    >
-                      <div className="flex flex-col sm:flex-row">
-                        <div className="relative h-56 w-full overflow-hidden rounded-t-xl sm:h-auto sm:w-72 sm:rounded-l-xl sm:rounded-tr-none">
-                          <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
-                          {favorites.includes(listing.id) && (
-                            <div className="absolute right-3 top-3 rounded-full bg-emerald-800 px-3 py-1 text-xs font-semibold text-white">
-                              Saved
+                      {/* Content */}
+                      <div className="flex-1 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="text-lg font-semibold text-zinc-900 group-hover:underline truncate">
+                              {listing.address}, {listing.city}
                             </div>
-                          )}
-                        </div>
-
-                        <div className="flex-1 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="text-lg font-semibold text-zinc-900 hover:underline">
-                                {listing.address}, {listing.city}
-                              </div>
-                              <div className="mt-1 text-sm text-zinc-600">
-                                {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
-                              </div>
+                            <div className="mt-1 text-sm text-zinc-600">
+                              {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft · {listing.type}
                             </div>
+                          </div>
 
+                          <div className="flex items-center gap-2">
                             <button
                               onClick={(e) => {
                                 e.preventDefault()
@@ -420,216 +597,220 @@ export default function Home() {
                                 const next = toggleFavorite(listing.id)
                                 setFavorites(next)
                               }}
-                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                                favorites.includes(listing.id)
+                              className={cn(
+                                "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                                isSaved
                                   ? "border-emerald-800 bg-emerald-800 text-white"
                                   : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
-                              }`}
+                              )}
                             >
-                              {favorites.includes(listing.id) ? "Saved" : "Save"}
+                              {isSaved ? "Saved" : "Save"}
                             </button>
                           </div>
+                        </div>
 
-                          <div className="mt-3 flex items-end justify-between">
-                            <div>
-                              <div className="text-xs text-zinc-600">Price</div>
-                              <div className="text-2xl font-bold text-zinc-900">{fmtMoney(listing.price)}</div>
+                        {/* Big financial headline */}
+                        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
+                          <div>
+                            <div className="text-xs text-zinc-600">Price</div>
+                            <div className="text-2xl font-bold text-zinc-900">{fmtMoney(listing.price)}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-xs text-zinc-600">Est rent</div>
+                            <div className="text-lg font-semibold text-zinc-900">{fmtMoney(listing.rentEstimate)}</div>
+                          </div>
+
+                          <div className="sm:text-right">
+                            <div className="text-xs text-zinc-600">All-in cash flow</div>
+                            <div className={cn("text-2xl font-extrabold tracking-tight", cashFlowColor)}>
+                              {fmtMoney(u.cashFlow)}/mo
                             </div>
-
-                            <div className="text-right text-xs text-zinc-500">
+                            <div className="mt-1 text-xs text-zinc-500">
                               CoC {fmtPct(u.cocReturnPct)} · Cap {fmtPct(u.capRatePct)}
                             </div>
                           </div>
+                        </div>
 
-                          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            <MetricCard label="Est rent" value={fmtMoney(listing.rentEstimate)} />
-                            <MetricCard label="Mortgage" value={fmtMoney(u.mortgage)} />
-                            <MetricCard
-                              label="Rent − Mortgage"
-                              value={fmtMoney(quickRentMinusMortgage)}
-                              valueClass={quickColor}
-                            />
-                            <MetricCard
-                              label="All in cash flow"
-                              value={fmtMoney(u.cashFlow)}
-                              valueClass={cashFlowColor}
-                              hoverTitle="All in cash flow"
-                              hoverBody={
-                                <div className="space-y-2">
-                                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                                    <div>Rent</div>
-                                    <div className="text-right font-semibold">{fmtMoney(listing.rentEstimate)}</div>
+                        {/* Metrics (kept, but calmer) */}
+                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <MetricCard label="Mortgage" value={fmtMoney(u.mortgage)} />
+                          <MetricCard label="Rent − Mortgage" value={fmtMoney(quickRentMinusMortgage)} valueClass={quickColor} />
+                          <MetricCard
+                            label="Rent coverage"
+                            value={`${u.rentToPayment.toFixed(2)}x`}
+                            valueClass={u.rentToPayment >= 1 ? "text-emerald-700" : "text-rose-600"}
+                          />
+                          <MetricCard
+                            label="All-in cash flow"
+                            value={fmtMoney(u.cashFlow)}
+                            valueClass={cashFlowColor}
+                            hoverTitle="All in cash flow"
+                            hoverBody={
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                                  <div>Rent</div>
+                                  <div className="text-right font-semibold">{fmtMoney(listing.rentEstimate)}</div>
 
-                                    <div>Mortgage</div>
-                                    <div className="text-right font-semibold">{fmtMoney(u.mortgage)}</div>
+                                  <div>Mortgage</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.mortgage)}</div>
 
-                                    <div>Taxes</div>
-                                    <div className="text-right font-semibold">{fmtMoney(u.taxesMonthly)}</div>
+                                  <div>Taxes</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.taxesMonthly)}</div>
 
-                                    <div>Insurance</div>
-                                    <div className="text-right font-semibold">{fmtMoney(u.insuranceMonthly)}</div>
+                                  <div>Insurance</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.insuranceMonthly)}</div>
 
-                                    <div>HOA</div>
-                                    <div className="text-right font-semibold">{fmtMoney(u.hoaMonthly)}</div>
+                                  <div>HOA</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.hoaMonthly)}</div>
 
-                                    <div>Vacancy</div>
-                                    <div className="text-right font-semibold">{fmtMoney(u.vacancy)}</div>
+                                  <div>Vacancy</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.vacancy)}</div>
 
-                                    <div>Management</div>
-                                    <div className="text-right font-semibold">{fmtMoney(u.management)}</div>
+                                  <div>Management</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.management)}</div>
 
-                                    <div>Maintenance</div>
-                                    <div className="text-right font-semibold">{fmtMoney(u.maintenance)}</div>
-                                  </div>
-
-                                  <div className="border-t pt-2">
-                                    <div className="flex items-center justify-between">
-                                      <div className="text-xs font-semibold text-zinc-900">Cash flow</div>
-                                      <div
-                                        className={`text-xs font-bold ${
-                                          u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
-                                        }`}
-                                      >
-                                        {fmtMoney(u.cashFlow)}
-                                      </div>
-                                    </div>
-                                    <div className="mt-1 text-[10px] text-zinc-500">
-                                      Cash flow = Rent − (Mortgage + Taxes + Insurance + HOA + Vacancy + Management +
-                                      Maintenance)
-                                    </div>
-                                  </div>
+                                  <div>Maintenance</div>
+                                  <div className="text-right font-semibold">{fmtMoney(u.maintenance)}</div>
                                 </div>
-                              }
-                            />
-                          </div>
 
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
-                              Rent ÷ Payment: {u.rentToPayment.toFixed(2)}x
-                            </span>
-
-                            <div className="relative group/other overflow-visible">
-                              <span className="cursor-default rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-zinc-700">
-                                Other costs: {fmtMoney(otherCosts)}
-                              </span>
-
-                              <div className="pointer-events-auto absolute left-0 top-full z-[100] mt-2 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover/other:block">
-                                <div className="text-xs font-semibold text-zinc-900">Other costs breakdown</div>
-                                <div className="mt-2 grid grid-cols-2 gap-2">
-                                  <div>
-                                    Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span>
+                                <div className="border-t pt-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs font-semibold text-zinc-900">Cash flow</div>
+                                    <div className={cn("text-xs font-bold", cashFlowColor)}>{fmtMoney(u.cashFlow)}</div>
                                   </div>
-                                  <div>
-                                    Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span>
+                                  <div className="mt-1 text-[10px] text-zinc-500">
+                                    Cash flow = Rent − (Mortgage + Taxes + Insurance + HOA + Vacancy + Management + Maintenance)
                                   </div>
-                                  <div>
-                                    HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span>
-                                  </div>
-                                  <div>
-                                    Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span>
-                                  </div>
-                                  <div>
-                                    Management: <span className="font-semibold">{fmtMoney(u.management)}</span>
-                                  </div>
-                                  <div>
-                                    Maintenance: <span className="font-semibold">{fmtMoney(u.maintenance)}</span>
-                                  </div>
-                                </div>
-                                <div className="mt-2 border-t pt-2">
-                                  Total: <span className="font-semibold">{fmtMoney(otherCosts)}</span>
                                 </div>
                               </div>
-                            </div>
+                            }
+                          />
+                        </div>
 
-                            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
-                              HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo
+                        {/* Tags / pills */}
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
+                            HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo
+                          </span>
+
+                          <div className="relative group/other overflow-visible">
+                            <span className="cursor-default rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-zinc-700">
+                              Operating costs: {fmtMoney(otherCosts)}
                             </span>
+
+                            <div className="pointer-events-auto absolute left-0 top-full z-[100] mt-2 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover/other:block">
+                              <div className="text-xs font-semibold text-zinc-900">Operating costs breakdown</div>
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
+                                <div>Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
+                                <div>HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span></div>
+                                <div>Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span></div>
+                                <div>Management: <span className="font-semibold">{fmtMoney(u.management)}</span></div>
+                                <div>Maintenance: <span className="font-semibold">{fmtMoney(u.maintenance)}</span></div>
+                              </div>
+                              <div className="mt-2 border-t pt-2">
+                                Total: <span className="font-semibold">{fmtMoney(otherCosts)}</span>
+                              </div>
+                            </div>
                           </div>
+
+                          {listing.yearBuilt && (
+                            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
+                              Built: {listing.yearBuilt}
+                            </span>
+                          )}
                         </div>
                       </div>
-                    </Link>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-12">
+              <div className="lg:col-span-7">
+                <ListingMap points={mapPoints} selectedId={selectedId} onSelect={(id) => setSelectedId(id)} />
+                {!selectedId && (
+                  <div className="mt-2 text-xs text-zinc-600">
+                    Pins show all filtered listings. Click a pin or hover a listing to focus.
+                  </div>
+                )}
+              </div>
+
+              <div className="lg:col-span-5 space-y-3">
+                {rows.map(({ listing, u }) => {
+                  const isSelected = listing.id === selectedId
+                  const isSaved = favorites.includes(listing.id)
+
+                  return (
+                    <div
+                      key={listing.id}
+                      className={cn(
+                        "cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition",
+                        isSelected ? "border-emerald-800 ring-2 ring-emerald-100" : "border-emerald-100 hover:border-emerald-200"
+                      )}
+                      onClick={() => setSelectedId(listing.id)}
+                      onMouseEnter={() => setSelectedId(listing.id)} // hover focuses map
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-zinc-900 truncate">
+                            {listing.address}, {listing.city}
+                          </div>
+                          <div className="mt-1 text-xs text-zinc-600">
+                            {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
+                          </div>
+                        </div>
+
+                        <div className={cn("text-sm font-extrabold", u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600")}>
+                          {fmtMoney(u.cashFlow)}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            const next = toggleFavorite(listing.id)
+                            setFavorites(next)
+                          }}
+                          className={cn(
+                            "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                            isSaved
+                              ? "border-emerald-800 bg-emerald-800 text-white"
+                              : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
+                          )}
+                        >
+                          {isSaved ? "Saved" : "Save"}
+                        </button>
+
+                        <Link
+                          href={`/listing/${String(listing.id)}`}
+                          className="text-xs font-semibold text-emerald-800 underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Open
+                        </Link>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
-            ) : (
-              <div className="grid gap-4 lg:grid-cols-12">
-                <div className="lg:col-span-7">
-                  <ListingMap points={mapPoints} selectedId={selectedId} onSelect={(id) => setSelectedId(id)} />
-                  {!selectedId && (
-                    <div className="mt-2 text-xs text-zinc-600">
-                      Pins show all filtered listings. Click a pin or listing to focus.
-                    </div>
-                  )}
-                </div>
-
-                <div className="lg:col-span-5 space-y-3">
-                  {rows.map(({ listing, u }) => {
-                    const isSelected = listing.id === selectedId
-                    return (
-                      <div
-                        key={listing.id}
-                        className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition ${
-                          isSelected
-                            ? "border-emerald-800 ring-2 ring-emerald-100"
-                            : "border-emerald-100 hover:border-emerald-200"
-                        }`}
-                        onClick={() => setSelectedId(listing.id)}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-semibold text-zinc-900">
-                              {listing.address}, {listing.city}
-                            </div>
-                            <div className="mt-1 text-xs text-zinc-600">
-                              {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
-                            </div>
-                          </div>
-                          <div className={`text-sm font-bold ${u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                            {fmtMoney(u.cashFlow)}
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between">
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              const next = toggleFavorite(listing.id)
-                              setFavorites(next)
-                            }}
-                            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                              favorites.includes(listing.id)
-                                ? "border-emerald-800 bg-emerald-800 text-white"
-                                : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
-                            }`}
-                          >
-                            {favorites.includes(listing.id) ? "Saved" : "Save"}
-                          </button>
-
-                          <Link
-                            href={`/listing/${String(listing.id)}`}
-                            className="text-xs font-semibold text-emerald-800 underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            Open
-                          </Link>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-10 text-xs text-zinc-500">
-              Demo data only. Later you’ll replace LISTINGS with NWMLS feed data.
             </div>
+          )}
+
+          <div className="mt-10 text-xs text-zinc-500">
+            Demo data only. Later you’ll replace LISTINGS with NWMLS feed data.
           </div>
         </div>
       </div>
     </div>
   )
 }
+
+/** ---------- Metric card w/ hover tooltip ---------- */
 
 function MetricCard(props: {
   label: string
@@ -642,9 +823,9 @@ function MetricCard(props: {
 
   return (
     <div className="relative overflow-visible">
-      <div className={`rounded-lg border border-zinc-200 bg-white p-3 ${hasHover ? "group/metric cursor-help" : ""}`}>
+      <div className={cn("rounded-lg border border-zinc-200 bg-white p-3", hasHover && "group/metric cursor-help")}>
         <div className="text-xs text-zinc-600">{props.label}</div>
-        <div className={`mt-1 text-sm font-semibold ${props.valueClass ?? "text-zinc-900"}`}>
+        <div className={cn("mt-1 text-sm font-semibold", props.valueClass ?? "text-zinc-900")}>
           {props.value}
         </div>
 
