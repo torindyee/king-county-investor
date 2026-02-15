@@ -148,44 +148,67 @@ function RangeSlider(props: {
   onChange: (nextMin: number, nextMax: number) => void
   format: (n: number) => string
 }) {
-  const minV = props.valueMin
-  const maxV = props.valueMax
+  const minV = clamp(props.valueMin, props.min, props.max)
+  const maxV = clamp(props.valueMax, props.min, props.max)
+
+  // Prevent crossing
+  const safeMin = Math.min(minV, maxV)
+  const safeMax = Math.max(maxV, minV)
+
+  const range = props.max - props.min
+  const leftPct = range === 0 ? 0 : ((safeMin - props.min) / range) * 100
+  const rightPct = range === 0 ? 0 : ((safeMax - props.min) / range) * 100
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium text-zinc-600">{props.label}</div>
         <div className="text-xs text-zinc-700">
-          <span className="font-semibold">{props.format(minV)}</span>
+          <span className="font-semibold">{props.format(safeMin)}</span>
           <span className="mx-1 text-zinc-400">—</span>
-          <span className="font-semibold">{props.format(maxV)}</span>
+          <span className="font-semibold">{props.format(safeMax)}</span>
         </div>
       </div>
 
-      <div className="relative">
+      {/* Track */}
+      <div className="relative h-9">
+        {/* Base track */}
+        <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-zinc-200" />
+
+        {/* Active range fill */}
+        <div
+          className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-emerald-700"
+          style={{ left: `${leftPct}%`, width: `${Math.max(0, rightPct - leftPct)}%` }}
+        />
+
+        {/* Min thumb input */}
         <input
           type="range"
           min={props.min}
           max={props.max}
           step={props.step}
-          value={minV}
+          value={safeMin}
           onChange={(e) => {
             const nextMin = Number(e.target.value)
-            props.onChange(Math.min(nextMin, maxV), maxV)
+            props.onChange(Math.min(nextMin, safeMax), safeMax)
           }}
-          className="w-full accent-emerald-700"
+          className="range-thumb absolute inset-0 z-20 w-full appearance-none bg-transparent"
+          aria-label={`${props.label} min`}
         />
+
+        {/* Max thumb input */}
         <input
           type="range"
           min={props.min}
           max={props.max}
           step={props.step}
-          value={maxV}
+          value={safeMax}
           onChange={(e) => {
             const nextMax = Number(e.target.value)
-            props.onChange(minV, Math.max(nextMax, minV))
+            props.onChange(safeMin, Math.max(nextMax, safeMin))
           }}
-          className="w-full accent-emerald-700 -mt-2"
+          className="range-thumb absolute inset-0 z-10 w-full appearance-none bg-transparent"
+          aria-label={`${props.label} max`}
         />
       </div>
 
@@ -193,6 +216,38 @@ function RangeSlider(props: {
         <span>{props.format(props.min)}</span>
         <span>{props.format(props.max)}</span>
       </div>
+
+      {/* Thumb styling (scoped via className so it doesn't affect other ranges) */}
+      <style jsx>{`
+        .range-thumb::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 9999px;
+          background: white;
+          border: 2px solid #047857; /* emerald-700 */
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+          cursor: pointer;
+          margin-top: -5px; /* aligns thumb with our 8px track in webkit */
+        }
+        .range-thumb::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 9999px;
+          background: white;
+          border: 2px solid #047857;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+          cursor: pointer;
+        }
+        .range-thumb::-webkit-slider-runnable-track {
+          -webkit-appearance: none;
+          background: transparent;
+        }
+        .range-thumb::-moz-range-track {
+          background: transparent;
+        }
+      `}</style>
     </div>
   )
 }
