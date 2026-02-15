@@ -14,25 +14,46 @@ const DEFAULT_SCENARIO: Scenario = {
   downPaymentPct: 0.25,
   interestRatePct: 6.75,
   termYears: 30,
+  // NOTE: we keep these fields to satisfy the Scenario type,
+  // but we do NOT use them as user-entered assumptions anymore.
+  // We override them per listing with estimateTaxRatePct + estimateInsuranceMonthly.
   propertyTaxRatePct: 1.0,
   insuranceMonthly: 180,
+
   hoaMonthly: 0,
   vacancyPct: 0.06,
   managementPct: 0.08,
   maintenancePct: 0.07,
 }
 
-/** ---------- Small UI helpers ---------- */
+/** ---------- Utils / UI helpers ---------- */
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ")
 }
 
-function PanelShell(props: {
-  title: string
-  right?: React.ReactNode
-  children: React.ReactNode
-}) {
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n))
+}
+
+function Chevron(props: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className={cn("h-4 w-4 text-zinc-600 transition", props.open && "rotate-180")}
+      aria-hidden="true"
+    >
+      <path
+        fillRule="evenodd"
+        d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.937a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z"
+        clipRule="evenodd"
+      />
+    </svg>
+  )
+}
+
+function PanelShell(props: { title: string; children: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-emerald-100 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
@@ -52,18 +73,6 @@ function Chip(props: { label: string; onClick?: () => void }) {
       className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs text-zinc-700 hover:border-emerald-200 hover:bg-emerald-50"
     >
       {props.label}
-    </button>
-  )
-}
-
-function PrimaryButton(props: { children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      className="rounded-md bg-emerald-800 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-900"
-    >
-      {props.children}
     </button>
   )
 }
@@ -123,35 +132,141 @@ function NumberField(props: {
   )
 }
 
-function SliderRow(props: {
+/**
+ * "Two-handle" range slider without extra libraries:
+ * - One slider for min
+ * - One slider for max
+ * - Guardrails prevent crossing
+ */
+function RangeSlider(props: {
   label: string
-  valueLabel: string
   min: number
   max: number
   step: number
-  value: number
-  onChange: (v: number) => void
+  valueMin: number
+  valueMax: number
+  onChange: (nextMin: number, nextMax: number) => void
+  format: (n: number) => string
 }) {
+  const minV = props.valueMin
+  const maxV = props.valueMax
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-zinc-800">{props.label}</div>
-        <div className="text-sm text-zinc-600">{props.valueLabel}</div>
+        <div className="text-xs font-medium text-zinc-600">{props.label}</div>
+        <div className="text-xs text-zinc-700">
+          <span className="font-semibold">{props.format(minV)}</span>
+          <span className="mx-1 text-zinc-400">—</span>
+          <span className="font-semibold">{props.format(maxV)}</span>
+        </div>
       </div>
-      <input
-        type="range"
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={props.value}
-        onChange={(e) => props.onChange(Number(e.target.value))}
-        className="w-full accent-emerald-700"
-      />
+
+      <div className="relative">
+        <input
+          type="range"
+          min={props.min}
+          max={props.max}
+          step={props.step}
+          value={minV}
+          onChange={(e) => {
+            const nextMin = Number(e.target.value)
+            props.onChange(Math.min(nextMin, maxV), maxV)
+          }}
+          className="w-full accent-emerald-700"
+        />
+        <input
+          type="range"
+          min={props.min}
+          max={props.max}
+          step={props.step}
+          value={maxV}
+          onChange={(e) => {
+            const nextMax = Number(e.target.value)
+            props.onChange(minV, Math.max(nextMax, minV))
+          }}
+          className="w-full accent-emerald-700 -mt-2"
+        />
+      </div>
+
+      <div className="flex items-center justify-between text-[11px] text-zinc-500">
+        <span>{props.format(props.min)}</span>
+        <span>{props.format(props.max)}</span>
+      </div>
     </div>
   )
 }
 
-/** ---------- Main page ---------- */
+/** ---------- Per-listing estimates (demo heuristic) ---------- */
+
+/**
+ * IMPORTANT: This is not “real tax” like Zillow (they use parcel/county sources).
+ * For demo, we produce stable, believable estimates based on location + type.
+ */
+function estimateTaxRatePct(listing: (typeof LISTINGS)[number]) {
+  // baseline effective rate (demo)
+  let rate = 1.02
+
+  // small location nudges (demo only, not a factual claim)
+  const city = listing.city.toLowerCase()
+  if (city.includes("seattle")) rate -= 0.05
+  if (city.includes("bellevue")) rate += 0.06
+  if (city.includes("kirkland")) rate += 0.03
+  if (city.includes("sammamish")) rate += 0.02
+  if (city.includes("renton")) rate += 0.01
+
+  // condos often have slightly different effective rates (demo)
+  if (listing.type === "Condo") rate -= 0.03
+
+  return clamp(rate, 0.85, 1.35)
+}
+
+function estimateInsuranceMonthly(listing: (typeof LISTINGS)[number]) {
+  // annual insurance percent of price (demo)
+  let annualPct = 0.0032 // 0.32% baseline
+
+  if (listing.type === "Condo") annualPct = 0.0020
+  if (listing.type === "Townhome") annualPct = 0.0026
+  if (listing.type === "Multi Family") annualPct = 0.0038
+
+  // price scaling: cheaper homes tend to have higher % insurance, expensive lower %
+  const price = listing.price
+  if (price < 600000) annualPct += 0.0004
+  if (price > 1200000) annualPct -= 0.0004
+
+  const annual = price * annualPct
+  return Math.round(annual / 12 / 10) * 10 // round to nearest $10
+}
+
+/** ---------- Metric card w/ hover tooltip ---------- */
+
+function MetricCard(props: {
+  label: string
+  value: string
+  valueClass?: string
+  hoverTitle?: string
+  hoverBody?: React.ReactNode
+}) {
+  const hasHover = Boolean(props.hoverBody)
+
+  return (
+    <div className="relative overflow-visible">
+      <div className={cn("rounded-lg border border-zinc-200 bg-white p-3", hasHover && "group/metric cursor-help")}>
+        <div className="text-xs text-zinc-600">{props.label}</div>
+        <div className={cn("mt-1 text-sm font-semibold", props.valueClass ?? "text-zinc-900")}>{props.value}</div>
+
+        {hasHover && (
+          <div className="pointer-events-none absolute right-0 top-full z-[100] mt-2 hidden w-[340px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover/metric:block">
+            <div className="text-xs font-semibold text-zinc-900">{props.hoverTitle ?? props.label}</div>
+            <div className="mt-2">{props.hoverBody}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** ---------- Page ---------- */
 
 export default function Home() {
   const [scenario, setScenario] = useState<Scenario>(DEFAULT_SCENARIO)
@@ -162,33 +277,104 @@ export default function Home() {
   const [favorites, setFavorites] = useState<number[]>([])
   const [onlyFavorites, setOnlyFavorites] = useState(false)
 
-  const [showFilters, setShowFilters] = useState(true)
-  const [showAssumptions, setShowAssumptions] = useState(false)
+  // dropdown caret panels
+  const [filtersOpen, setFiltersOpen] = useState(true)
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
-  // Filters
-  const [minPrice, setMinPrice] = useState(0)
-  const [maxPrice, setMaxPrice] = useState(0)
-  const [minRent, setMinRent] = useState(0)
-  const [maxRent, setMaxRent] = useState(0)
-  const [minMortgage, setMinMortgage] = useState(0)
-  const [maxMortgage, setMaxMortgage] = useState(0)
-  const [minCashFlow, setMinCashFlow] = useState(0)
-  const [minHoa, setMinHoa] = useState(0)
-  const [maxHoa, setMaxHoa] = useState(0)
-
-  // Down payment: percent or amount, but we keep scenario.downPaymentPct as the single source of truth
+  // Down payment input
   const [dpMode, setDpMode] = useState<DownPaymentMode>("percent")
   const [dpInput, setDpInput] = useState(Math.round(DEFAULT_SCENARIO.downPaymentPct * 100))
 
-  useEffect(() => {
-    setFavorites(getFavorites())
-  }, [])
-
+  // Reference price for $ <-> % conversion display
   const basePriceForDownPayment = useMemo(() => {
-    // Use median listing price as the reference for showing % <-> $ conversion.
     const prices = LISTINGS.map((l) => l.price).slice().sort((a, b) => a - b)
     const mid = Math.floor(prices.length / 2)
     return prices.length % 2 === 0 ? Math.round((prices[mid - 1] + prices[mid]) / 2) : prices[mid]
+  }, [])
+
+  // Range stats (from data + current assumptions for mortgage)
+  const stats = useMemo(() => {
+    const prices = LISTINGS.map((l) => l.price)
+    const rents = LISTINGS.map((l) => l.rentEstimate)
+    const hoas = LISTINGS.map((l) => l.hoaMonthly ?? 0)
+
+    // mortgage depends on rate + DP, and now on per-listing tax/insurance estimates
+    const mortgages = LISTINGS.map((l) => {
+      const s: Scenario = {
+        ...scenario,
+        hoaMonthly: (l.hoaMonthly ?? 0) + scenario.hoaMonthly,
+        propertyTaxRatePct: estimateTaxRatePct(l),
+        insuranceMonthly: estimateInsuranceMonthly(l),
+      }
+      const u = underwriting({ price: l.price, rentMonthly: l.rentEstimate, scenario: s })
+      return u.mortgage
+    })
+
+    const min = (arr: number[]) => Math.min(...arr)
+    const max = (arr: number[]) => Math.max(...arr)
+
+    return {
+      priceMin: min(prices),
+      priceMax: max(prices),
+      rentMin: min(rents),
+      rentMax: max(rents),
+      hoaMin: min(hoas),
+      hoaMax: max(hoas),
+      mortgageMin: min(mortgages),
+      mortgageMax: max(mortgages),
+    }
+  }, [scenario])
+
+  // Range state (initialize once stats exist)
+  const [priceMin, setPriceMin] = useState(0)
+  const [priceMax, setPriceMax] = useState(0)
+  const [rentMin, setRentMin] = useState(0)
+  const [rentMax, setRentMax] = useState(0)
+  const [hoaMin, setHoaMin] = useState(0)
+  const [hoaMax, setHoaMax] = useState(0)
+  const [mortgageMin, setMortgageMin] = useState(0)
+  const [mortgageMax, setMortgageMax] = useState(0)
+
+  const [minCashFlow, setMinCashFlow] = useState(0)
+
+  // When stats change (notably mortgage ranges), ensure our current values remain valid
+  useEffect(() => {
+    if (priceMin === 0 && priceMax === 0) {
+      setPriceMin(stats.priceMin)
+      setPriceMax(stats.priceMax)
+    } else {
+      setPriceMin((v) => clamp(v, stats.priceMin, stats.priceMax))
+      setPriceMax((v) => clamp(v, stats.priceMin, stats.priceMax))
+    }
+
+    if (rentMin === 0 && rentMax === 0) {
+      setRentMin(stats.rentMin)
+      setRentMax(stats.rentMax)
+    } else {
+      setRentMin((v) => clamp(v, stats.rentMin, stats.rentMax))
+      setRentMax((v) => clamp(v, stats.rentMin, stats.rentMax))
+    }
+
+    if (hoaMin === 0 && hoaMax === 0) {
+      setHoaMin(stats.hoaMin)
+      setHoaMax(stats.hoaMax)
+    } else {
+      setHoaMin((v) => clamp(v, stats.hoaMin, stats.hoaMax))
+      setHoaMax((v) => clamp(v, stats.hoaMin, stats.hoaMax))
+    }
+
+    if (mortgageMin === 0 && mortgageMax === 0) {
+      setMortgageMin(stats.mortgageMin)
+      setMortgageMax(stats.mortgageMax)
+    } else {
+      setMortgageMin((v) => clamp(v, stats.mortgageMin, stats.mortgageMax))
+      setMortgageMax((v) => clamp(v, stats.mortgageMin, stats.mortgageMax))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats])
+
+  useEffect(() => {
+    setFavorites(getFavorites())
   }, [])
 
   // Keep dpInput and scenario.downPaymentPct in sync
@@ -205,34 +391,43 @@ export default function Home() {
 
   // If scenario changes (reset), reflect into dpInput
   useEffect(() => {
-    if (dpMode === "percent") {
-      setDpInput(Math.round(scenario.downPaymentPct * 100))
-    } else {
-      setDpInput(Math.round(scenario.downPaymentPct * basePriceForDownPayment))
-    }
+    if (dpMode === "percent") setDpInput(Math.round(scenario.downPaymentPct * 100))
+    else setDpInput(Math.round(scenario.downPaymentPct * basePriceForDownPayment))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenario.downPaymentPct])
 
   const rows = useMemo(() => {
     const computed = LISTINGS.map((l) => {
-      const s: Scenario = { ...scenario, hoaMonthly: (l.hoaMonthly ?? 0) + scenario.hoaMonthly }
+      const estTaxRatePct = estimateTaxRatePct(l)
+      const estInsuranceMonthly = estimateInsuranceMonthly(l)
+
+      const s: Scenario = {
+        ...scenario,
+        hoaMonthly: (l.hoaMonthly ?? 0) + scenario.hoaMonthly,
+        propertyTaxRatePct: estTaxRatePct,
+        insuranceMonthly: estInsuranceMonthly,
+      }
+
       const u = underwriting({ price: l.price, rentMonthly: l.rentEstimate, scenario: s })
 
       const quickRentMinusMortgage = l.rentEstimate - u.mortgage
       const otherCosts = u.taxesMonthly + u.insuranceMonthly + u.hoaMonthly + u.vacancy + u.management + u.maintenance
 
-      return { listing: l, u, quickRentMinusMortgage, otherCosts }
+      return { listing: l, u, quickRentMinusMortgage, otherCosts, estTaxRatePct, estInsuranceMonthly }
     })
 
     const filtered = computed.filter(({ listing, u }) => {
-      const priceOk = (minPrice ? listing.price >= minPrice : true) && (maxPrice ? listing.price <= maxPrice : true)
-      const rentOk = (minRent ? listing.rentEstimate >= minRent : true) && (maxRent ? listing.rentEstimate <= maxRent : true)
-      const mortgageOk = (minMortgage ? u.mortgage >= minMortgage : true) && (maxMortgage ? u.mortgage <= maxMortgage : true)
+      const priceOk = listing.price >= priceMin && listing.price <= priceMax
+      const rentOk = listing.rentEstimate >= rentMin && listing.rentEstimate <= rentMax
+
+      const hoa = listing.hoaMonthly ?? 0
+      const hoaOk = hoa >= hoaMin && hoa <= hoaMax
+
+      const mortgageOk = u.mortgage >= mortgageMin && u.mortgage <= mortgageMax
       const cashFlowOk = minCashFlow ? u.cashFlow >= minCashFlow : true
       const favOk = onlyFavorites ? favorites.includes(listing.id) : true
-      const hoa = listing.hoaMonthly ?? 0
-      const hoaOk = (minHoa ? hoa >= minHoa : true) && (maxHoa ? hoa <= maxHoa : true)
-      return priceOk && rentOk && mortgageOk && cashFlowOk && hoaOk && favOk
+
+      return priceOk && rentOk && hoaOk && mortgageOk && cashFlowOk && favOk
     })
 
     const sorted = [...filtered].sort((a, b) => {
@@ -251,15 +446,15 @@ export default function Home() {
   }, [
     scenario,
     sortKey,
-    minPrice,
-    maxPrice,
-    minRent,
-    maxRent,
-    minMortgage,
-    maxMortgage,
+    priceMin,
+    priceMax,
+    rentMin,
+    rentMax,
+    hoaMin,
+    hoaMax,
+    mortgageMin,
+    mortgageMax,
     minCashFlow,
-    minHoa,
-    maxHoa,
     onlyFavorites,
     favorites,
   ])
@@ -276,39 +471,80 @@ export default function Home() {
   const activeChips = useMemo(() => {
     const chips: Array<{ label: string; clear: () => void }> = []
 
-    if (minPrice) chips.push({ label: `Price ≥ ${fmtMoney(minPrice)}`, clear: () => setMinPrice(0) })
-    if (maxPrice) chips.push({ label: `Price ≤ ${fmtMoney(maxPrice)}`, clear: () => setMaxPrice(0) })
+    if (priceMin !== stats.priceMin || priceMax !== stats.priceMax) {
+      chips.push({
+        label: `Price ${fmtMoney(priceMin)}—${fmtMoney(priceMax)}`,
+        clear: () => {
+          setPriceMin(stats.priceMin)
+          setPriceMax(stats.priceMax)
+        },
+      })
+    }
 
-    if (minRent) chips.push({ label: `Rent ≥ ${fmtMoney(minRent)}`, clear: () => setMinRent(0) })
-    if (maxRent) chips.push({ label: `Rent ≤ ${fmtMoney(maxRent)}`, clear: () => setMaxRent(0) })
+    if (rentMin !== stats.rentMin || rentMax !== stats.rentMax) {
+      chips.push({
+        label: `Rent ${fmtMoney(rentMin)}—${fmtMoney(rentMax)}`,
+        clear: () => {
+          setRentMin(stats.rentMin)
+          setRentMax(stats.rentMax)
+        },
+      })
+    }
 
-    if (minMortgage) chips.push({ label: `Mortgage ≥ ${fmtMoney(minMortgage)}`, clear: () => setMinMortgage(0) })
-    if (maxMortgage) chips.push({ label: `Mortgage ≤ ${fmtMoney(maxMortgage)}`, clear: () => setMaxMortgage(0) })
+    if (hoaMin !== stats.hoaMin || hoaMax !== stats.hoaMax) {
+      chips.push({
+        label: `HOA ${fmtMoney(hoaMin)}—${fmtMoney(hoaMax)}`,
+        clear: () => {
+          setHoaMin(stats.hoaMin)
+          setHoaMax(stats.hoaMax)
+        },
+      })
+    }
 
-    if (minHoa) chips.push({ label: `HOA ≥ ${fmtMoney(minHoa)}`, clear: () => setMinHoa(0) })
-    if (maxHoa) chips.push({ label: `HOA ≤ ${fmtMoney(maxHoa)}`, clear: () => setMaxHoa(0) })
+    if (mortgageMin !== stats.mortgageMin || mortgageMax !== stats.mortgageMax) {
+      chips.push({
+        label: `Mortgage ${fmtMoney(mortgageMin)}—${fmtMoney(mortgageMax)}`,
+        clear: () => {
+          setMortgageMin(stats.mortgageMin)
+          setMortgageMax(stats.mortgageMax)
+        },
+      })
+    }
 
     if (minCashFlow) chips.push({ label: `Cash flow ≥ ${fmtMoney(minCashFlow)}`, clear: () => setMinCashFlow(0) })
     if (onlyFavorites) chips.push({ label: `Favorites only`, clear: () => setOnlyFavorites(false) })
 
     return chips
-  }, [minPrice, maxPrice, minRent, maxRent, minMortgage, maxMortgage, minHoa, maxHoa, minCashFlow, onlyFavorites])
+  }, [
+    priceMin,
+    priceMax,
+    rentMin,
+    rentMax,
+    hoaMin,
+    hoaMax,
+    mortgageMin,
+    mortgageMax,
+    minCashFlow,
+    onlyFavorites,
+    stats,
+  ])
 
-  function clearAllFilters() {
-    setMinPrice(0)
-    setMaxPrice(0)
-    setMinRent(0)
-    setMaxRent(0)
-    setMinMortgage(0)
-    setMaxMortgage(0)
+  function clearAll() {
+    setPriceMin(stats.priceMin)
+    setPriceMax(stats.priceMax)
+    setRentMin(stats.rentMin)
+    setRentMax(stats.rentMax)
+    setHoaMin(stats.hoaMin)
+    setHoaMax(stats.hoaMax)
+    setMortgageMin(stats.mortgageMin)
+    setMortgageMax(stats.mortgageMax)
     setMinCashFlow(0)
-    setMinHoa(0)
-    setMaxHoa(0)
     setOnlyFavorites(false)
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-white to-zinc-50">
+    // Background: neutral + emerald accents (more premium than a green wash)
+    <div className="min-h-screen bg-gradient-to-b from-white via-zinc-50 to-white">
       <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Header */}
         <div className="flex flex-col gap-2">
@@ -316,7 +552,7 @@ export default function Home() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-zinc-900">King County Investment Finder</h1>
               <p className="mt-1 text-sm text-zinc-700">
-                Scan deals fast. Sort by performance. Use assumptions to model your strategy.
+                Scan deals fast. Sort by performance. Adjust assumptions to match your strategy.
               </p>
               <p className="mt-1 text-xs text-zinc-500">{favorites.length} saved properties</p>
             </div>
@@ -349,40 +585,32 @@ export default function Home() {
                 <option value="price">Sort: Price</option>
                 <option value="rent">Sort: Rent</option>
               </select>
-
-              <GhostButton onClick={() => setShowFilters((v) => !v)}>
-                {showFilters ? "Hide filters" : "Show filters"}
-              </GhostButton>
-
-              <GhostButton onClick={() => setShowAssumptions((v) => !v)}>
-                {showAssumptions ? "Hide assumptions" : "Assumptions"}
-              </GhostButton>
             </div>
           </div>
         </div>
 
-        {/* Sticky controls + panels */}
+        {/* Sticky controls */}
         <div className="sticky top-4 z-30 mt-6 space-y-4">
-          {/* Active chips */}
+          {/* Results + chips */}
           <div className="rounded-xl border border-emerald-100 bg-white p-3 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <div className="text-xs font-semibold text-zinc-700">
                   Showing {rows.length} result{rows.length === 1 ? "" : "s"}
                 </div>
-                {activeChips.length > 0 && (
+
+                {activeChips.length > 0 ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {activeChips.map((c) => (
                       <Chip key={c.label} label={`✕ ${c.label}`} onClick={c.clear} />
                     ))}
                   </div>
-                )}
-                {activeChips.length === 0 && (
+                ) : (
                   <div className="text-xs text-zinc-500">No filters applied</div>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-sm text-zinc-700">
                   <input
                     type="checkbox"
@@ -392,172 +620,218 @@ export default function Home() {
                   />
                   Favorites only
                 </label>
-                <GhostButton onClick={clearAllFilters}>Clear all</GhostButton>
+                <GhostButton onClick={clearAll}>Clear all</GhostButton>
               </div>
             </div>
           </div>
 
-          {showFilters && (
-            <PanelShell
-              title="Filters"
-              right={
-                <button
-                  onClick={clearAllFilters}
-                  className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
-                >
-                  Clear
-                </button>
-              }
-            >
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <NumberField label="Price min" value={minPrice} onChange={setMinPrice} placeholder="e.g. 600000" />
-                <NumberField label="Price max" value={maxPrice} onChange={setMaxPrice} placeholder="e.g. 900000" />
-
-                <NumberField label="Rent min" value={minRent} onChange={setMinRent} placeholder="e.g. 3000" />
-                <NumberField label="Rent max" value={maxRent} onChange={setMaxRent} placeholder="e.g. 5500" />
-
-                <NumberField label="HOA min" value={minHoa} onChange={setMinHoa} placeholder="e.g. 0" />
-                <NumberField label="HOA max" value={maxHoa} onChange={setMaxHoa} placeholder="e.g. 600" />
-
-                <NumberField label="Mortgage min" value={minMortgage} onChange={setMinMortgage} placeholder="e.g. 2500" />
-                <NumberField label="Mortgage max" value={maxMortgage} onChange={setMaxMortgage} placeholder="e.g. 4500" />
-
-                <div className="sm:col-span-2">
-                  <NumberField label="Cash flow min" value={minCashFlow} onChange={setMinCashFlow} placeholder="e.g. 200" />
+          {/* Caret dropdown headers */}
+          <div className="grid gap-4 lg:grid-cols-12">
+            <div className="lg:col-span-8">
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((v) => !v)}
+                className="w-full rounded-xl border border-emerald-100 bg-white px-4 py-3 shadow-sm hover:bg-zinc-50"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-zinc-900">Filters</div>
+                  <Chevron open={filtersOpen} />
                 </div>
-              </div>
-            </PanelShell>
-          )}
+              </button>
 
-          {showAssumptions && (
-            <PanelShell
-              title="Assumptions"
-              right={
-                <button
-                  onClick={() => setScenario(DEFAULT_SCENARIO)}
-                  className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
-                >
-                  Reset
-                </button>
-              }
-            >
-              {/* Rate + DP as typed fields */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <NumberField
-                  label="Interest rate"
-                  value={scenario.interestRatePct}
-                  onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
-                  placeholder="e.g. 6.75"
-                  suffix="%"
-                />
+              {filtersOpen && (
+                <div className="mt-3">
+                  <PanelShell
+                    title="Filters"
+                    right={
+                      <button onClick={clearAll} className="text-xs font-medium text-zinc-600 hover:text-zinc-900">
+                        Reset ranges
+                      </button>
+                    }
+                  >
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <RangeSlider
+                        label="Price"
+                        min={stats.priceMin}
+                        max={stats.priceMax}
+                        step={5000}
+                        valueMin={priceMin}
+                        valueMax={priceMax}
+                        onChange={(a, b) => {
+                          setPriceMin(a)
+                          setPriceMax(b)
+                        }}
+                        format={fmtMoney}
+                      />
 
-                <div className="sm:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-medium text-zinc-600">Down payment</div>
-                    <button
-                      onClick={() => setDpMode((m) => (m === "percent" ? "amount" : "percent"))}
-                      className="text-[11px] font-semibold text-emerald-800 underline"
-                    >
-                      Use {dpMode === "percent" ? "$ amount" : "%"}
-                    </button>
-                  </div>
+                      <RangeSlider
+                        label="Rent"
+                        min={stats.rentMin}
+                        max={stats.rentMax}
+                        step={50}
+                        valueMin={rentMin}
+                        valueMax={rentMax}
+                        onChange={(a, b) => {
+                          setRentMin(a)
+                          setRentMax(b)
+                        }}
+                        format={fmtMoney}
+                      />
 
-                  <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <NumberField
-                      label={dpMode === "percent" ? "Percent" : "Amount"}
-                      value={dpInput}
-                      onChange={setDpInput}
-                      placeholder={dpMode === "percent" ? "e.g. 20" : "e.g. 150000"}
-                      suffix={dpMode === "percent" ? "%" : "$"}
-                      smallHint={
-                        dpMode === "percent"
-                          ? `≈ ${fmtMoney(basePriceForDownPayment * (dpInput / 100))} on ${fmtMoney(basePriceForDownPayment)}`
-                          : `≈ ${((dpInput / basePriceForDownPayment) * 100).toFixed(1)}% on ${fmtMoney(basePriceForDownPayment)}`
-                      }
-                    />
+                      <RangeSlider
+                        label="HOA"
+                        min={stats.hoaMin}
+                        max={stats.hoaMax}
+                        step={5}
+                        valueMin={hoaMin}
+                        valueMax={hoaMax}
+                        onChange={(a, b) => {
+                          setHoaMin(a)
+                          setHoaMax(b)
+                        }}
+                        format={fmtMoney}
+                      />
 
-                    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-                      <div className="text-xs font-medium text-zinc-700">Current assumption</div>
-                      <div className="mt-1 text-sm font-semibold text-zinc-900">
-                        {Math.round(scenario.downPaymentPct * 100)}%
-                        <span className="ml-2 text-xs font-medium text-zinc-500">
-                          (≈ {fmtMoney(scenario.downPaymentPct * basePriceForDownPayment)} on {fmtMoney(basePriceForDownPayment)})
-                        </span>
-                      </div>
-                      <div className="mt-1 text-[11px] text-zinc-500">
-                        We use this % across listings for underwriting.
+                      <RangeSlider
+                        label="Mortgage"
+                        min={stats.mortgageMin}
+                        max={stats.mortgageMax}
+                        step={25}
+                        valueMin={mortgageMin}
+                        valueMax={mortgageMax}
+                        onChange={(a, b) => {
+                          setMortgageMin(a)
+                          setMortgageMax(b)
+                        }}
+                        format={fmtMoney}
+                      />
+
+                      <div className="sm:col-span-2">
+                        <NumberField
+                          label="Cash flow min"
+                          value={minCashFlow}
+                          onChange={setMinCashFlow}
+                          placeholder="e.g. 200"
+                        />
                       </div>
                     </div>
-                  </div>
+                  </PanelShell>
                 </div>
-              </div>
+              )}
+            </div>
 
-              {/* The rest stay as sliders (fast tuning) */}
-              <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div className="space-y-4">
-                  <SliderRow
-                    label="Property tax rate (annual)"
-                    valueLabel={`${scenario.propertyTaxRatePct.toFixed(2)}%`}
-                    min={0.5}
-                    max={2.0}
-                    step={0.01}
-                    value={scenario.propertyTaxRatePct}
-                    onChange={(v) => setScenario({ ...scenario, propertyTaxRatePct: v })}
-                  />
-                  <SliderRow
-                    label="Insurance (monthly)"
-                    valueLabel={fmtMoney(scenario.insuranceMonthly)}
-                    min={50}
-                    max={400}
-                    step={10}
-                    value={scenario.insuranceMonthly}
-                    onChange={(v) => setScenario({ ...scenario, insuranceMonthly: v })}
-                  />
+            <div className="lg:col-span-4">
+              <button
+                type="button"
+                onClick={() => setAssumptionsOpen((v) => !v)}
+                className="w-full rounded-xl border border-emerald-100 bg-white px-4 py-3 shadow-sm hover:bg-zinc-50"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-zinc-900">Assumptions</div>
+                  <Chevron open={assumptionsOpen} />
                 </div>
+              </button>
 
-                <div className="space-y-4">
-                  <div className="text-xs font-semibold text-zinc-600">Operating reserves</div>
-                  <SliderRow
-                    label="Vacancy"
-                    valueLabel={`${Math.round(scenario.vacancyPct * 100)}%`}
-                    min={0}
-                    max={15}
-                    step={1}
-                    value={Math.round(scenario.vacancyPct * 100)}
-                    onChange={(v) => setScenario({ ...scenario, vacancyPct: v / 100 })}
-                  />
-                  <SliderRow
-                    label="Management"
-                    valueLabel={`${Math.round(scenario.managementPct * 100)}%`}
-                    min={0}
-                    max={15}
-                    step={1}
-                    value={Math.round(scenario.managementPct * 100)}
-                    onChange={(v) => setScenario({ ...scenario, managementPct: v / 100 })}
-                  />
-                  <SliderRow
-                    label="Maintenance"
-                    valueLabel={`${Math.round(scenario.maintenancePct * 100)}%`}
-                    min={0}
-                    max={20}
-                    step={1}
-                    value={Math.round(scenario.maintenancePct * 100)}
-                    onChange={(v) => setScenario({ ...scenario, maintenancePct: v / 100 })}
-                  />
+              {assumptionsOpen && (
+                <div className="mt-3">
+                  <PanelShell
+                    title="Assumptions"
+                    right={
+                      <button
+                        onClick={() => setScenario(DEFAULT_SCENARIO)}
+                        className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+                      >
+                        Reset
+                      </button>
+                    }
+                  >
+                    <div className="grid grid-cols-1 gap-4">
+                      <NumberField
+                        label="Interest rate"
+                        value={scenario.interestRatePct}
+                        onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
+                        placeholder="e.g. 6.75"
+                        suffix="%"
+                      />
+
+                      {/* Down payment: fixed single-line layout */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-medium text-zinc-600">Down payment</div>
+                          <button
+                            onClick={() => setDpMode((m) => (m === "percent" ? "amount" : "percent"))}
+                            className="text-[11px] font-semibold text-emerald-800 underline"
+                          >
+                            Use {dpMode === "percent" ? "$ amount" : "%"}
+                          </button>
+                        </div>
+
+                        <NumberField
+                          label={dpMode === "percent" ? "Percent" : "Amount"}
+                          value={dpInput}
+                          onChange={setDpInput}
+                          placeholder={dpMode === "percent" ? "e.g. 20" : "e.g. 150000"}
+                          suffix={dpMode === "percent" ? "%" : "$"}
+                          smallHint={
+                            dpMode === "percent"
+                              ? `≈ ${fmtMoney(basePriceForDownPayment * (dpInput / 100))} on ${fmtMoney(basePriceForDownPayment)}`
+                              : `≈ ${((dpInput / basePriceForDownPayment) * 100).toFixed(1)}% on ${fmtMoney(basePriceForDownPayment)}`
+                          }
+                        />
+                        <div className="text-[11px] text-zinc-500">
+                          Tax + insurance are estimated per listing (demo heuristic), like a Zillow-style estimate.
+                        </div>
+                      </div>
+
+                      {/* Operating reserves remain as sliders (quick tuning) */}
+                      <div className="border-t border-zinc-100 pt-4">
+                        <div className="text-xs font-semibold text-zinc-600">Operating reserves</div>
+
+                        <div className="mt-3 space-y-4">
+                          <SliderRow
+                            label="Vacancy"
+                            valueLabel={`${Math.round(scenario.vacancyPct * 100)}%`}
+                            min={0}
+                            max={15}
+                            step={1}
+                            value={Math.round(scenario.vacancyPct * 100)}
+                            onChange={(v) => setScenario({ ...scenario, vacancyPct: v / 100 })}
+                          />
+                          <SliderRow
+                            label="Management"
+                            valueLabel={`${Math.round(scenario.managementPct * 100)}%`}
+                            min={0}
+                            max={15}
+                            step={1}
+                            value={Math.round(scenario.managementPct * 100)}
+                            onChange={(v) => setScenario({ ...scenario, managementPct: v / 100 })}
+                          />
+                          <SliderRow
+                            label="Maintenance"
+                            valueLabel={`${Math.round(scenario.maintenancePct * 100)}%`}
+                            min={0}
+                            max={20}
+                            step={1}
+                            value={Math.round(scenario.maintenancePct * 100)}
+                            onChange={(v) => setScenario({ ...scenario, maintenancePct: v / 100 })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </PanelShell>
                 </div>
-              </div>
-            </PanelShell>
-          )}
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Main content */}
         <div className="mt-6">
           {viewMode === "list" ? (
             <div className="grid gap-4">
-              {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts }) => {
+              {rows.map(({ listing, u, quickRentMinusMortgage, otherCosts, estInsuranceMonthly, estTaxRatePct }) => {
                 const isSaved = favorites.includes(listing.id)
-                const cashFlowGood = u.cashFlow >= 0
-                const cashFlowColor = cashFlowGood ? "text-emerald-700" : "text-rose-600"
+                const cashFlowColor = u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
                 const quickColor = quickRentMinusMortgage >= 0 ? "text-emerald-700" : "text-rose-600"
 
                 return (
@@ -567,7 +841,6 @@ export default function Home() {
                     className="group rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md overflow-visible"
                   >
                     <div className="flex flex-col sm:flex-row">
-                      {/* Image */}
                       <div className="relative h-48 w-full overflow-hidden rounded-t-xl sm:h-auto sm:w-64 sm:rounded-l-xl sm:rounded-tr-none">
                         <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
                         {isSaved && (
@@ -577,7 +850,6 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* Content */}
                       <div className="flex-1 p-4">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
@@ -589,27 +861,24 @@ export default function Home() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                const next = toggleFavorite(listing.id)
-                                setFavorites(next)
-                              }}
-                              className={cn(
-                                "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                                isSaved
-                                  ? "border-emerald-800 bg-emerald-800 text-white"
-                                  : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
-                              )}
-                            >
-                              {isSaved ? "Saved" : "Save"}
-                            </button>
-                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              const next = toggleFavorite(listing.id)
+                              setFavorites(next)
+                            }}
+                            className={cn(
+                              "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                              isSaved
+                                ? "border-emerald-800 bg-emerald-800 text-white"
+                                : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
+                            )}
+                          >
+                            {isSaved ? "Saved" : "Save"}
+                          </button>
                         </div>
 
-                        {/* Big financial headline */}
                         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
                           <div>
                             <div className="text-xs text-zinc-600">Price</div>
@@ -632,7 +901,6 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Metrics (kept, but calmer) */}
                         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                           <MetricCard label="Mortgage" value={fmtMoney(u.mortgage)} />
                           <MetricCard label="Rent − Mortgage" value={fmtMoney(quickRentMinusMortgage)} valueClass={quickColor} />
@@ -655,11 +923,14 @@ export default function Home() {
                                   <div>Mortgage</div>
                                   <div className="text-right font-semibold">{fmtMoney(u.mortgage)}</div>
 
-                                  <div>Taxes</div>
-                                  <div className="text-right font-semibold">{fmtMoney(u.taxesMonthly)}</div>
+                                  <div>Taxes (est)</div>
+                                  <div className="text-right font-semibold">
+                                    {fmtMoney(u.taxesMonthly)}
+                                    <span className="ml-1 text-[10px] text-zinc-500">({estTaxRatePct.toFixed(2)}%)</span>
+                                  </div>
 
-                                  <div>Insurance</div>
-                                  <div className="text-right font-semibold">{fmtMoney(u.insuranceMonthly)}</div>
+                                  <div>Insurance (est)</div>
+                                  <div className="text-right font-semibold">{fmtMoney(estInsuranceMonthly)}</div>
 
                                   <div>HOA</div>
                                   <div className="text-right font-semibold">{fmtMoney(u.hoaMonthly)}</div>
@@ -680,7 +951,7 @@ export default function Home() {
                                     <div className={cn("text-xs font-bold", cashFlowColor)}>{fmtMoney(u.cashFlow)}</div>
                                   </div>
                                   <div className="mt-1 text-[10px] text-zinc-500">
-                                    Cash flow = Rent − (Mortgage + Taxes + Insurance + HOA + Vacancy + Management + Maintenance)
+                                    Estimates shown for demo. Replace with real tax/insurance data when you add NWMLS + parcel sources.
                                   </div>
                                 </div>
                               </div>
@@ -688,7 +959,6 @@ export default function Home() {
                           />
                         </div>
 
-                        {/* Tags / pills */}
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                           <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-zinc-700">
                             HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo
@@ -702,8 +972,8 @@ export default function Home() {
                             <div className="pointer-events-auto absolute left-0 top-full z-[100] mt-2 hidden w-[320px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover/other:block">
                               <div className="text-xs font-semibold text-zinc-900">Operating costs breakdown</div>
                               <div className="mt-2 grid grid-cols-2 gap-2">
-                                <div>Taxes: <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
-                                <div>Insurance: <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
+                                <div>Taxes (est): <span className="font-semibold">{fmtMoney(u.taxesMonthly)}</span></div>
+                                <div>Insurance (est): <span className="font-semibold">{fmtMoney(u.insuranceMonthly)}</span></div>
                                 <div>HOA: <span className="font-semibold">{fmtMoney(u.hoaMonthly)}</span></div>
                                 <div>Vacancy: <span className="font-semibold">{fmtMoney(u.vacancy)}</span></div>
                                 <div>Management: <span className="font-semibold">{fmtMoney(u.management)}</span></div>
@@ -751,7 +1021,7 @@ export default function Home() {
                         isSelected ? "border-emerald-800 ring-2 ring-emerald-100" : "border-emerald-100 hover:border-emerald-200"
                       )}
                       onClick={() => setSelectedId(listing.id)}
-                      onMouseEnter={() => setSelectedId(listing.id)} // hover focuses map
+                      onMouseEnter={() => setSelectedId(listing.id)}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -778,9 +1048,7 @@ export default function Home() {
                           }}
                           className={cn(
                             "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                            isSaved
-                              ? "border-emerald-800 bg-emerald-800 text-white"
-                              : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
+                            isSaved ? "border-emerald-800 bg-emerald-800 text-white" : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
                           )}
                         >
                           {isSaved ? "Saved" : "Save"}
@@ -802,7 +1070,7 @@ export default function Home() {
           )}
 
           <div className="mt-10 text-xs text-zinc-500">
-            Demo data only. Later you’ll replace LISTINGS with NWMLS feed data.
+            Demo data only. Later you’ll replace LISTINGS with NWMLS feed data and real parcel-based tax + insurance sources.
           </div>
         </div>
       </div>
@@ -810,32 +1078,31 @@ export default function Home() {
   )
 }
 
-/** ---------- Metric card w/ hover tooltip ---------- */
-
-function MetricCard(props: {
+/** SliderRow (kept for reserves) */
+function SliderRow(props: {
   label: string
-  value: string
-  valueClass?: string
-  hoverTitle?: string
-  hoverBody?: React.ReactNode
+  valueLabel: string
+  min: number
+  max: number
+  step: number
+  value: number
+  onChange: (v: number) => void
 }) {
-  const hasHover = Boolean(props.hoverBody)
-
   return (
-    <div className="relative overflow-visible">
-      <div className={cn("rounded-lg border border-zinc-200 bg-white p-3", hasHover && "group/metric cursor-help")}>
-        <div className="text-xs text-zinc-600">{props.label}</div>
-        <div className={cn("mt-1 text-sm font-semibold", props.valueClass ?? "text-zinc-900")}>
-          {props.value}
-        </div>
-
-        {hasHover && (
-          <div className="pointer-events-none absolute right-0 top-full z-[100] mt-2 hidden w-[340px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover/metric:block">
-            <div className="text-xs font-semibold text-zinc-900">{props.hoverTitle ?? props.label}</div>
-            <div className="mt-2">{props.hoverBody}</div>
-          </div>
-        )}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium text-zinc-800">{props.label}</div>
+        <div className="text-sm text-zinc-600">{props.valueLabel}</div>
       </div>
+      <input
+        type="range"
+        min={props.min}
+        max={props.max}
+        step={props.step}
+        value={props.value}
+        onChange={(e) => props.onChange(Number(e.target.value))}
+        className="w-full accent-emerald-700"
+      />
     </div>
   )
 }
