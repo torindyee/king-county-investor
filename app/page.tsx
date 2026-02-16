@@ -272,7 +272,7 @@ function estimateInsuranceMonthly(listing: (typeof LISTINGS)[number]) {
 
   if (listing.type === "Condo") annualPct = 0.0020
   if (listing.type === "Townhome") annualPct = 0.0026
-  if (listing.type === "Multi Family") annualPct = 0.0038
+
 
   const price = listing.price
   if (price < 600000) annualPct += 0.0004
