@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { LISTINGS } from "./lib/listings"
 import ListingMap from "./ListingMap"
 import { Scenario, fmtMoney, fmtPct, underwriting } from "./lib/finance"
@@ -77,6 +77,32 @@ function Chip(props: { label: string; onClick?: () => void }) {
   )
 }
 
+function CollapsibleSection(props: {
+  title: string
+  right?: React.ReactNode
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-xl border border-emerald-100 bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={props.onToggle}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-50"
+      >
+        <div className="text-sm font-semibold text-zinc-900">{props.title}</div>
+        <div className="flex items-center gap-3">
+          {props.right}
+          <Chevron open={props.open} />
+        </div>
+      </button>
+
+      {props.open && <div className="border-t border-zinc-100 p-4">{props.children}</div>}
+    </div>
+  )
+}
+
 function GhostButton(props: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
@@ -148,25 +174,61 @@ function RangeSlider(props: {
   onChange: (nextMin: number, nextMax: number) => void
   format: (n: number) => string
 }) {
+  const trackRef = useRef<HTMLDivElement | null>(null)
   const [active, setActive] = useState<"min" | "max" | null>(null)
 
-  const minV = clamp(props.valueMin, props.min, props.max)
-  const maxV = clamp(props.valueMax, props.min, props.max)
-
-  const safeMin = Math.min(minV, maxV)
-  const safeMax = Math.max(maxV, minV)
+  const safeMin = clamp(Math.min(props.valueMin, props.valueMax), props.min, props.max)
+  const safeMax = clamp(Math.max(props.valueMin, props.valueMax), props.min, props.max)
 
   const range = props.max - props.min
   const leftPct = range === 0 ? 0 : ((safeMin - props.min) / range) * 100
   const rightPct = range === 0 ? 0 : ((safeMax - props.min) / range) * 100
 
-  // Default layering when not dragging:
-  // Put max on top so the right thumb is easy to grab.
-  // While dragging, force the grabbed thumb to be on top.
-  const minZ =
-    active === "min" ? "z-30" : active === "max" ? "z-10" : "z-10"
-  const maxZ =
-    active === "max" ? "z-30" : active === "min" ? "z-10" : "z-20"
+  const snap = (v: number) => {
+    const stepped = Math.round((v - props.min) / props.step) * props.step + props.min
+    return clamp(stepped, props.min, props.max)
+  }
+
+  const valueFromClientX = (clientX: number) => {
+    const el = trackRef.current
+    if (!el) return props.min
+    const r = el.getBoundingClientRect()
+    const t = clamp((clientX - r.left) / r.width, 0, 1)
+    return snap(props.min + t * (props.max - props.min))
+  }
+
+  useEffect(() => {
+    if (!active) return
+
+    const onMove = (e: PointerEvent) => {
+      const v = valueFromClientX(e.clientX)
+      if (active === "min") props.onChange(Math.min(v, safeMax), safeMax)
+      if (active === "max") props.onChange(safeMin, Math.max(v, safeMin))
+    }
+
+    const onUp = () => setActive(null)
+
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onUp)
+
+    return () => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onUp)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, safeMin, safeMax])
+
+  const onTrackPointerDown = (e: React.PointerEvent) => {
+    const v = valueFromClientX(e.clientX)
+    const distToMin = Math.abs(v - safeMin)
+    const distToMax = Math.abs(v - safeMax)
+    const which: "min" | "max" = distToMin <= distToMax ? "min" : "max"
+    setActive(which)
+    if (which === "min") props.onChange(Math.min(v, safeMax), safeMax)
+    else props.onChange(safeMin, Math.max(v, safeMin))
+  }
 
   return (
     <div className="space-y-2">
@@ -180,46 +242,46 @@ function RangeSlider(props: {
       </div>
 
       <div className="relative h-9">
-        <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-zinc-200" />
+        {/* Track */}
+        <div
+          ref={trackRef}
+          onPointerDown={onTrackPointerDown}
+          className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 cursor-pointer rounded-full bg-zinc-200"
+        />
+
+        {/* Fill */}
         <div
           className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-emerald-700"
-          style={{ left: `${leftPct}%`, width: `${Math.max(0, rightPct - leftPct)}%` }}
+          style={{
+            left: `${leftPct}%`,
+            width: `${Math.max(0, rightPct - leftPct)}%`,
+          }}
         />
 
-        {/* MIN thumb */}
-        <input
-          type="range"
-          min={props.min}
-          max={props.max}
-          step={props.step}
-          value={safeMin}
-          onPointerDown={() => setActive("min")}
-          onPointerUp={() => setActive(null)}
-          onPointerCancel={() => setActive(null)}
-          onChange={(e) => {
-            const nextMin = Number(e.target.value)
-            props.onChange(Math.min(nextMin, safeMax), safeMax)
+        {/* Min thumb */}
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setActive("min")
           }}
-          className={`range-thumb absolute inset-0 ${minZ} w-full appearance-none bg-transparent`}
-          aria-label={`${props.label} min`}
+          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-emerald-700 bg-white shadow-sm"
+          style={{ left: `${leftPct}%`, width: 18, height: 18 }}
+          aria-label={`${props.label} minimum`}
         />
 
-        {/* MAX thumb */}
-        <input
-          type="range"
-          min={props.min}
-          max={props.max}
-          step={props.step}
-          value={safeMax}
-          onPointerDown={() => setActive("max")}
-          onPointerUp={() => setActive(null)}
-          onPointerCancel={() => setActive(null)}
-          onChange={(e) => {
-            const nextMax = Number(e.target.value)
-            props.onChange(safeMin, Math.max(nextMax, safeMin))
+        {/* Max thumb */}
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setActive("max")
           }}
-          className={`range-thumb absolute inset-0 ${maxZ} w-full appearance-none bg-transparent`}
-          aria-label={`${props.label} max`}
+          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-emerald-700 bg-white shadow-sm"
+          style={{ left: `${rightPct}%`, width: 18, height: 18 }}
+          aria-label={`${props.label} maximum`}
         />
       </div>
 
@@ -227,40 +289,10 @@ function RangeSlider(props: {
         <span>{props.format(props.min)}</span>
         <span>{props.format(props.max)}</span>
       </div>
-
-      <style jsx>{`
-        .range-thumb::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 18px;
-          height: 18px;
-          border-radius: 9999px;
-          background: white;
-          border: 2px solid #047857;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-          cursor: pointer;
-          margin-top: -5px;
-        }
-        .range-thumb::-moz-range-thumb {
-          width: 18px;
-          height: 18px;
-          border-radius: 9999px;
-          background: white;
-          border: 2px solid #047857;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-          cursor: pointer;
-        }
-        .range-thumb::-webkit-slider-runnable-track {
-          -webkit-appearance: none;
-          background: transparent;
-        }
-        .range-thumb::-moz-range-track {
-          background: transparent;
-        }
-      `}</style>
     </div>
   )
 }
+
 
 /** ---------- Per-listing estimates (demo heuristic) ---------- */
 
@@ -690,205 +722,217 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Caret dropdown headers */}
-          <div className="grid gap-4 lg:grid-cols-12">
-            <div className="lg:col-span-8">
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((v) => !v)}
-                className="w-full rounded-xl border border-emerald-100 bg-white px-4 py-3 shadow-sm hover:bg-zinc-50"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-zinc-900">Filters</div>
-                  <Chevron open={filtersOpen} />
-                </div>
-              </button>
+         {/* Filters + Assumptions (single header that opens content underneath) */}
+<div className="grid gap-4 lg:grid-cols-12">
+  <div className="lg:col-span-8">
+    <div className="rounded-xl border border-emerald-100 bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setFiltersOpen((v) => !v)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-50"
+      >
+        <div className="text-sm font-semibold text-zinc-900">Filters</div>
+        <Chevron open={filtersOpen} />
+      </button>
 
-              {filtersOpen && (
-                <div className="mt-3">
-                  <PanelShell
-                    title="Filters"
-                    right={
-                      <button onClick={clearAll} className="text-xs font-medium text-zinc-600 hover:text-zinc-900">
-                        Reset ranges
-                      </button>
-                    }
-                  >
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <RangeSlider
-                        label="Price"
-                        min={stats.priceMin}
-                        max={stats.priceMax}
-                        step={5000}
-                        valueMin={priceMin}
-                        valueMax={priceMax}
-                        onChange={(a, b) => {
-                          setPriceMin(a)
-                          setPriceMax(b)
-                        }}
-                        format={fmtMoney}
-                      />
+      {filtersOpen && (
+        <div className="border-t border-zinc-100 p-4">
+          <div className="flex items-center justify-end pb-3">
+            <button
+              onClick={() => {
+                setPriceMin(stats.priceMin)
+                setPriceMax(stats.priceMax)
+                setRentMin(stats.rentMin)
+                setRentMax(stats.rentMax)
+                setHoaMin(stats.hoaMin)
+                setHoaMax(stats.hoaMax)
+                setMortgageMin(stats.mortgageMin)
+                setMortgageMax(stats.mortgageMax)
+                setMinCashFlow(0)
+                setOnlyFavorites(false)
+              }}
+              className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+              type="button"
+            >
+              Reset ranges
+            </button>
+          </div>
 
-                      <RangeSlider
-                        label="Rent"
-                        min={stats.rentMin}
-                        max={stats.rentMax}
-                        step={50}
-                        valueMin={rentMin}
-                        valueMax={rentMax}
-                        onChange={(a, b) => {
-                          setRentMin(a)
-                          setRentMax(b)
-                        }}
-                        format={fmtMoney}
-                      />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <RangeSlider
+              label="Price"
+              min={stats.priceMin}
+              max={stats.priceMax}
+              step={5000}
+              valueMin={priceMin}
+              valueMax={priceMax}
+              onChange={(a, b) => {
+                setPriceMin(a)
+                setPriceMax(b)
+              }}
+              format={fmtMoney}
+            />
 
-                      <RangeSlider
-                        label="HOA"
-                        min={stats.hoaMin}
-                        max={stats.hoaMax}
-                        step={5}
-                        valueMin={hoaMin}
-                        valueMax={hoaMax}
-                        onChange={(a, b) => {
-                          setHoaMin(a)
-                          setHoaMax(b)
-                        }}
-                        format={fmtMoney}
-                      />
+            <RangeSlider
+              label="Rent"
+              min={stats.rentMin}
+              max={stats.rentMax}
+              step={50}
+              valueMin={rentMin}
+              valueMax={rentMax}
+              onChange={(a, b) => {
+                setRentMin(a)
+                setRentMax(b)
+              }}
+              format={fmtMoney}
+            />
 
-                      <RangeSlider
-                        label="Mortgage"
-                        min={stats.mortgageMin}
-                        max={stats.mortgageMax}
-                        step={25}
-                        valueMin={mortgageMin}
-                        valueMax={mortgageMax}
-                        onChange={(a, b) => {
-                          setMortgageMin(a)
-                          setMortgageMax(b)
-                        }}
-                        format={fmtMoney}
-                      />
+            <RangeSlider
+              label="HOA"
+              min={stats.hoaMin}
+              max={stats.hoaMax}
+              step={5}
+              valueMin={hoaMin}
+              valueMax={hoaMax}
+              onChange={(a, b) => {
+                setHoaMin(a)
+                setHoaMax(b)
+              }}
+              format={fmtMoney}
+            />
 
-                      <div className="sm:col-span-2">
-                        <NumberField
-                          label="Cash flow min"
-                          value={minCashFlow}
-                          onChange={setMinCashFlow}
-                          placeholder="e.g. 200"
-                        />
-                      </div>
-                    </div>
-                  </PanelShell>
-                </div>
-              )}
-            </div>
+            <RangeSlider
+              label="Mortgage"
+              min={stats.mortgageMin}
+              max={stats.mortgageMax}
+              step={25}
+              valueMin={mortgageMin}
+              valueMax={mortgageMax}
+              onChange={(a, b) => {
+                setMortgageMin(a)
+                setMortgageMax(b)
+              }}
+              format={fmtMoney}
+            />
 
-            <div className="lg:col-span-4">
-              <button
-                type="button"
-                onClick={() => setAssumptionsOpen((v) => !v)}
-                className="w-full rounded-xl border border-emerald-100 bg-white px-4 py-3 shadow-sm hover:bg-zinc-50"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-zinc-900">Assumptions</div>
-                  <Chevron open={assumptionsOpen} />
-                </div>
-              </button>
-
-              {assumptionsOpen && (
-                <div className="mt-3">
-                  <PanelShell
-                    title="Assumptions"
-                    right={
-                      <button
-                        onClick={() => setScenario(DEFAULT_SCENARIO)}
-                        className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
-                      >
-                        Reset
-                      </button>
-                    }
-                  >
-                    <div className="grid grid-cols-1 gap-4">
-                      <NumberField
-                        label="Interest rate"
-                        value={scenario.interestRatePct}
-                        onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
-                        placeholder="e.g. 6.75"
-                        suffix="%"
-                      />
-
-                      {/* Down payment: fixed single-line layout */}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs font-medium text-zinc-600">Down payment</div>
-                          <button
-                            onClick={() => setDpMode((m) => (m === "percent" ? "amount" : "percent"))}
-                            className="text-[11px] font-semibold text-emerald-800 underline"
-                          >
-                            Use {dpMode === "percent" ? "$ amount" : "%"}
-                          </button>
-                        </div>
-
-                        <NumberField
-                          label={dpMode === "percent" ? "Percent" : "Amount"}
-                          value={dpInput}
-                          onChange={setDpInput}
-                          placeholder={dpMode === "percent" ? "e.g. 20" : "e.g. 150000"}
-                          suffix={dpMode === "percent" ? "%" : "$"}
-                          smallHint={
-                            dpMode === "percent"
-                              ? `≈ ${fmtMoney(basePriceForDownPayment * (dpInput / 100))} on ${fmtMoney(basePriceForDownPayment)}`
-                              : `≈ ${((dpInput / basePriceForDownPayment) * 100).toFixed(1)}% on ${fmtMoney(basePriceForDownPayment)}`
-                          }
-                        />
-                        <div className="text-[11px] text-zinc-500">
-                          Tax + insurance are estimated per listing (demo heuristic), like a Zillow-style estimate.
-                        </div>
-                      </div>
-
-                      {/* Operating reserves remain as sliders (quick tuning) */}
-                      <div className="border-t border-zinc-100 pt-4">
-                        <div className="text-xs font-semibold text-zinc-600">Operating reserves</div>
-
-                        <div className="mt-3 space-y-4">
-                          <SliderRow
-                            label="Vacancy"
-                            valueLabel={`${Math.round(scenario.vacancyPct * 100)}%`}
-                            min={0}
-                            max={15}
-                            step={1}
-                            value={Math.round(scenario.vacancyPct * 100)}
-                            onChange={(v) => setScenario({ ...scenario, vacancyPct: v / 100 })}
-                          />
-                          <SliderRow
-                            label="Management"
-                            valueLabel={`${Math.round(scenario.managementPct * 100)}%`}
-                            min={0}
-                            max={15}
-                            step={1}
-                            value={Math.round(scenario.managementPct * 100)}
-                            onChange={(v) => setScenario({ ...scenario, managementPct: v / 100 })}
-                          />
-                          <SliderRow
-                            label="Maintenance"
-                            valueLabel={`${Math.round(scenario.maintenancePct * 100)}%`}
-                            min={0}
-                            max={20}
-                            step={1}
-                            value={Math.round(scenario.maintenancePct * 100)}
-                            onChange={(v) => setScenario({ ...scenario, maintenancePct: v / 100 })}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </PanelShell>
-                </div>
-              )}
+            <div className="sm:col-span-2">
+              <NumberField
+                label="Cash flow min"
+                value={minCashFlow}
+                onChange={setMinCashFlow}
+                placeholder="e.g. 200"
+              />
             </div>
           </div>
         </div>
+      )}
+    </div>
+  </div>
+
+  <div className="lg:col-span-4">
+    <div className="rounded-xl border border-emerald-100 bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setAssumptionsOpen((v) => !v)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-50"
+      >
+        <div className="text-sm font-semibold text-zinc-900">Assumptions</div>
+        <Chevron open={assumptionsOpen} />
+      </button>
+
+      {assumptionsOpen && (
+        <div className="border-t border-zinc-100 p-4">
+          <div className="flex items-center justify-end pb-3">
+            <button
+              onClick={() => setScenario(DEFAULT_SCENARIO)}
+              className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+              type="button"
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            <NumberField
+              label="Interest rate"
+              value={scenario.interestRatePct}
+              onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
+              placeholder="e.g. 6.75"
+              suffix="%"
+            />
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-medium text-zinc-600">Down payment</div>
+                <button
+                  type="button"
+                  onClick={() => setDpMode((m) => (m === "percent" ? "amount" : "percent"))}
+                  className="text-[11px] font-semibold text-emerald-800 underline"
+                >
+                  Use {dpMode === "percent" ? "$ amount" : "%"}
+                </button>
+              </div>
+
+              <NumberField
+                label={dpMode === "percent" ? "Percent" : "Amount"}
+                value={dpInput}
+                onChange={setDpInput}
+                placeholder={dpMode === "percent" ? "e.g. 20" : "e.g. 150000"}
+                suffix={dpMode === "percent" ? "%" : "$"}
+                smallHint={
+                  dpMode === "percent"
+                    ? `≈ ${fmtMoney(basePriceForDownPayment * (dpInput / 100))} on ${fmtMoney(basePriceForDownPayment)}`
+                    : `≈ ${((dpInput / basePriceForDownPayment) * 100).toFixed(
+                        1
+                      )}% on ${fmtMoney(basePriceForDownPayment)}`
+                }
+              />
+
+              <div className="text-[11px] text-zinc-500">
+                Tax + insurance are estimated per listing (demo heuristic), like a Zillow-style estimate.
+              </div>
+            </div>
+
+            <div className="border-t border-zinc-100 pt-4">
+              <div className="text-xs font-semibold text-zinc-600">Operating reserves</div>
+
+              <div className="mt-3 space-y-4">
+                <SliderRow
+                  label="Vacancy"
+                  valueLabel={`${Math.round(scenario.vacancyPct * 100)}%`}
+                  min={0}
+                  max={15}
+                  step={1}
+                  value={Math.round(scenario.vacancyPct * 100)}
+                  onChange={(v) => setScenario({ ...scenario, vacancyPct: v / 100 })}
+                />
+                <SliderRow
+                  label="Management"
+                  valueLabel={`${Math.round(scenario.managementPct * 100)}%`}
+                  min={0}
+                  max={15}
+                  step={1}
+                  value={Math.round(scenario.managementPct * 100)}
+                  onChange={(v) => setScenario({ ...scenario, managementPct: v / 100 })}
+                />
+                <SliderRow
+                  label="Maintenance"
+                  valueLabel={`${Math.round(scenario.maintenancePct * 100)}%`}
+                  min={0}
+                  max={20}
+                  step={1}
+                  value={Math.round(scenario.maintenancePct * 100)}
+                  onChange={(v) => setScenario({ ...scenario, maintenancePct: v / 100 })}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+
 
         {/* Main content */}
         <div className="mt-6">
