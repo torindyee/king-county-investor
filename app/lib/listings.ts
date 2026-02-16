@@ -39,11 +39,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.6829,
     lng: -122.3876,
     images: [
-      "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["Updated kitchen", "Quartz counters", "Fenced yard", "Garage", "Move-in ready"],
+    highlights: ["Hardwoods", "Gas range", "Fenced yard", "Attached garage", "Close to Ballard"],
     description:
-      "Move-in ready Ballard home with updated kitchen, quartz counters, stainless appliances, fresh paint, and new flooring. Bright living room, fenced yard, and garage. Updated throughout and well maintained.",
+      "Well-located home on a quiet residential street with a functional layout and good natural light. Kitchen has been refreshed over time and is fully usable, though some finishes show typical wear. Living and dining flow nicely and there’s a flexible bonus space that works well as office or den. Basement/storage areas are clean but not fully finished. Easy access to Ballard shops, dining, and major routes. Buyer to verify all information.",
   },
   {
     id: 1002,
@@ -62,11 +65,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.5377,
     lng: -122.3927,
     images: [
-      "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1501183638710-841dd1904471?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1560448204-603b3fc33ddc?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["Water views", "Strong layout", "Clean but dated", "Great upside", "Convenient West Seattle"],
+    highlights: ["View unit", "In-unit laundry", "Covered parking", "Elevator building", "Strong floor plan"],
     description:
-      "Waterfront condo with sweeping views. Kitchen and baths are original and a bit dated, but the unit is clean and fully functional. Ready for your personal touches, paint, and cosmetic updates.",
+      "View-facing condo with a well-proportioned floor plan and separate dining area. Interior is clean and ready to move in, with several original fixtures that a buyer may choose to update over time. Generous primary bedroom, good storage, and a comfortable living area for entertaining. HOA covers common area maintenance and building operations. Great West Seattle location with easy access to Alki, restaurants, and commuting routes. Buyer to verify HOA details and rental restrictions.",
   },
   {
     id: 1003,
@@ -85,11 +91,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.5698,
     lng: -122.1697,
     images: [
-      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1560185127-6a8c0f1e9b1d?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["Fully remodeled", "Designer lighting", "New bathrooms", "Great natural light", "Turnkey"],
+    highlights: ["Updated finishes", "Open kitchen", "Large primary suite", "Neighborhood park", "Great schools nearby"],
     description:
-      "Fully remodeled home in a quiet neighborhood. New kitchen, new bathrooms, designer lighting, and updated throughout. Turnkey condition with great natural light and an easy layout for renting.",
+      "Spacious home in a desirable neighborhood with an easy, livable layout. Kitchen opens to the main living area and includes updated counters and newer appliances. Upstairs offers four bedrooms including a generous primary suite with walk-in closet. Backyard is manageable and set up well for low-maintenance outdoor space. A few small cosmetic touch-ups may be desired depending on taste, but overall presents very well. Convenient access to shopping, dining, and commuter routes. Buyer to verify all info.",
   },
   {
     id: 1004,
@@ -108,11 +117,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.4966,
     lng: -122.2512,
     images: [
-      "https://images.unsplash.com/photo-1572120360610-d971b9d7767c?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1572120360610-d971b9d7767c?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["As-is", "Needs renovations", "Value-add", "Roof older", "Investor special"],
+    highlights: ["As-is sale", "Value-add opportunity", "Level lot", "Good layout", "Buyer to verify"],
     description:
-      "Investor special. Home needs work and is sold as-is. Flooring and paint needed. Roof is older and buyer to verify condition. Great upside for a rehab project in an improving area.",
+      "Opportunity for sweat equity. Functional layout on a level lot with good upside potential. Home is livable but would benefit from updates including paint, flooring, and kitchen/bath improvements. Some deferred maintenance is present and the home is being sold as-is. Convenient location with access to major routes and daily amenities. Buyer to verify condition, permits, and all information to their satisfaction.",
   },
   {
     id: 1005,
@@ -131,11 +143,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.6413,
     lng: -122.0455,
     images: [
-      "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1560449752-6d7b7b8d0d9f?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["Well maintained", "Updated kitchen", "Newer roof", "Minor cosmetic upside", "Great layout"],
+    highlights: ["Well maintained", "Large kitchen", "Bonus room", "Newer roof per seller", "Cul-de-sac feel"],
     description:
-      "Beautifully maintained home with updated kitchen and newer roof. Minor cosmetic items like paint touch-ups and carpet replacement could add value, but generally move-in ready.",
+      "Well-cared-for home with generous living spaces and a flexible floor plan. Large kitchen with plenty of cabinet space opens to an informal dining area and family room. Upstairs features a bonus room plus comfortable bedrooms, including a primary suite with walk-in closet. Overall condition is strong with normal wear; a buyer may choose to refresh paint or carpets depending on preference. Great neighborhood setting with convenient access to parks and schools. Buyer to verify all information.",
   },
   {
     id: 1006,
@@ -154,11 +169,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.6769,
     lng: -122.206,
     images: [
-      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1549187774-b4e9b0445b41?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1505691723518-36a5ac3b2d7e?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["Modern building", "Quartz counters", "Open layout", "Amenities", "Walkable location"],
+    highlights: ["Modern building", "Quartz counters", "Open layout", "Amenities", "Walkable to downtown"],
     description:
-      "Modern condo with open layout, stainless appliances, quartz counters, and newer building amenities. Like new and turnkey for renting. Strong location near restaurants and waterfront.",
+      "Modern condo with an efficient layout, large windows, and a clean, contemporary feel. Kitchen includes quartz counters and stainless appliances with good storage for the size. Building amenities and common areas are well maintained. Great lock-and-leave option near dining, waterfront, and daily conveniences. HOA covers common area maintenance and building operations. Buyer to verify rental cap and pet policy.",
   },
   {
     id: 1007,
@@ -177,11 +195,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.4969,
     lng: -122.1691,
     images: [
-      "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["Good bones", "Dated kitchen", "Needs flooring", "Paint needed", "Value-add potential"],
+    highlights: ["Good bones", "Great layout", "Large lot", "Needs updating", "Close to amenities"],
     description:
-      "Solid home with good bones but dated kitchen and bathrooms. Needs updating, paint, and flooring. Great opportunity for a minor fixer to improve rentability and long-term value.",
+      "Solid home with a practical layout and good separation of spaces. Kitchen and bathrooms are serviceable but dated, and most buyers will likely plan for cosmetic updates over time. Flooring and paint are candidates for refresh. Yard offers room for outdoor living and gardening. Convenient location near shopping, parks, and commuting routes. Buyer to verify all information and condition.",
   },
   {
     id: 1008,
@@ -200,11 +221,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.6836,
     lng: -122.1367,
     images: [
-      "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1560185127-6a8c0f1e9b1d?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1549187774-b4e9b0445b41?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["Fresh interior paint", "Updated finishes", "Great for renting", "Near employers", "Turnkey"],
+    highlights: ["End-unit feel", "Open main floor", "Attached garage", "Near employers", "Community amenities"],
     description:
-      "Well cared for townhome with updated finishes, newer appliances, and fresh interior paint. Move-in ready with minimal work. Ideal turnkey rental near major employers.",
+      "Townhome with an open main level and a layout that lives well. Kitchen and baths have modern finishes and good storage. Overall condition is strong with minor wear consistent with age. Attached garage plus additional storage space. HOA maintains common areas and community features. Excellent proximity to major employers, dining, and everyday conveniences. Buyer to verify HOA details and rental policies.",
   },
   {
     id: 1009,
@@ -223,11 +247,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.5213,
     lng: -122.3768,
     images: [
-      "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1505691723518-36a5ac3b2d7e?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1501183638710-841dd1904471?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["West Seattle", "Livable now", "Cosmetic TLC", "Older bathrooms", "Great rental demand area"],
+    highlights: ["Classic charm", "Flexible spaces", "Livable now", "Cosmetic updates", "Great location"],
     description:
-      "Classic West Seattle charm. Some deferred maintenance and cosmetic TLC needed. Bathrooms are older, kitchen could be refreshed, but home is livable and ready for incremental upgrades.",
+      "Charming home with a flexible layout and good natural light. The property has been maintained and is livable as-is, though many buyers will likely choose to update finishes over time. Kitchen and baths are functional, with some older elements. Great opportunity for incremental improvements without taking on a full renovation. Convenient West Seattle location near parks, dining, and commuting routes. Buyer to verify all information.",
   },
   {
     id: 1010,
@@ -246,11 +273,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.6733,
     lng: -122.1842,
     images: [
-      "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["As-is", "Possible water intrusion", "Major rehab", "Big upside", "Drainage remediation likely"],
+    highlights: ["Sold as-is", "Large layout", "Basement space", "Deferred maintenance", "Strong upside"],
     description:
-      "Large home with strong layout. Sold as-is. Reports of prior water intrusion in basement and visible wear. Needs major renovation work including flooring, drywall, and possible drainage remediation.",
+      "Large home with a strong footprint and multiple flexible living spaces. Property is being sold as-is and will require improvements. Interior shows wear in several areas and a buyer should plan for updates including finishes and repairs. Basement area offers additional space but may need work depending on intended use. Great upside for someone looking to renovate in a desirable area. Buyer to verify condition, square footage, and any prior work or permits.",
   },
   {
     id: 1011,
@@ -269,11 +299,14 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.6454,
     lng: -122.203,
     images: [
-      "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["Remodeled kitchen", "Updated baths", "New flooring", "Fresh paint", "Turnkey"],
+    highlights: ["Updated kitchen", "Fresh paint", "New flooring", "Great light", "Excellent location"],
     description:
-      "Tastefully updated with remodeled kitchen and baths, new flooring, and fresh paint. Clean inspection history per seller. Turnkey level condition with excellent renter appeal in Bellevue.",
+      "Tastefully updated home in a convenient Bellevue location. Kitchen and main living areas present very well and the layout is easy to furnish. Recent updates include refreshed finishes and flooring, with a clean, move-in ready feel. Yard is manageable and set up well for outdoor use. Close to shopping, parks, and major commute routes. Buyer to verify all information to their satisfaction.",
   },
   {
     id: 1012,
@@ -292,10 +325,13 @@ export const LISTINGS: readonly Listing[] = [
     lat: 47.6079,
     lng: -122.3165,
     images: [
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1501183638710-841dd1904471?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1560449752-6d7b7b8d0d9f?auto=format&fit=crop&w=1800&q=80",
+      "https://images.unsplash.com/photo-1549187774-b4e9b0445b41?auto=format&fit=crop&w=1800&q=80",
     ],
-    highlights: ["High-rise views", "Modern finishes", "Quartz counters", "Amenities", "Turnkey"],
+    highlights: ["Modern building", "Floor-to-ceiling windows", "Amenities", "Great views", "Prime location"],
     description:
-      "Downtown high-rise with modern finishes, quartz counters, and floor-to-ceiling windows. Like new, move-in ready, and turnkey for a furnished or long-term rental strategy.",
+      "Modern high-rise condo with a bright interior and large windows. Efficient layout with good separation between bedrooms and living space. Contemporary kitchen and baths with clean lines and ample storage. Building amenities and common areas are well maintained. Strong location with easy access to dining, transit, and neighborhood conveniences. Buyer to verify HOA details, rental cap, and any move-in/out fees.",
   },
-] 
+]
