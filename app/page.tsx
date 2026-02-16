@@ -2,15 +2,13 @@
 
 import Link from "next/link"
 import React, { useEffect, useMemo, useRef, useState } from "react"
+import { LISTINGS, ListingType } from "./lib/listings"
 import ListingMap from "./ListingMap"
-import { LISTINGS } from "./lib/listings"
 import { Scenario, fmtMoney, fmtPct, underwriting } from "./lib/finance"
 import { getFavorites, toggleFavorite } from "./lib/favorites"
 
 type SortKey = "cashFlow" | "coc" | "cap" | "rentToPayment" | "price" | "rent"
 type DownPaymentMode = "percent" | "amount"
-
-type ConditionLabel = "Turnkey" | "Minor Fixer Upper" | "Major Fixer Upper" | "State Unknown"
 
 const DEFAULT_SCENARIO: Scenario = {
   downPaymentPct: 0.25,
@@ -18,7 +16,6 @@ const DEFAULT_SCENARIO: Scenario = {
   termYears: 30,
   propertyTaxRatePct: 1.0,
   insuranceMonthly: 180,
-
   hoaMonthly: 0,
   vacancyPct: 0.06,
   managementPct: 0.08,
@@ -95,13 +92,7 @@ function NumberField(props: {
         <input
           type="number"
           inputMode="numeric"
-          value={
-            Number.isFinite(props.value) && props.value !== 0
-              ? props.value
-              : props.value === 0
-                ? 0
-                : ""
-          }
+          value={Number.isFinite(props.value) ? props.value : ""}
           placeholder={props.placeholder}
           onChange={(e) => props.onChange(Number(e.target.value))}
           className={cn(
@@ -120,7 +111,7 @@ function NumberField(props: {
 }
 
 /**
- * "Two-handle" range slider without extra libraries:
+ * "Two-handle" range slider:
  * - One slider for min
  * - One slider for max
  * - Guardrails prevent crossing
@@ -211,10 +202,7 @@ function RangeSlider(props: {
 
         <div
           className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-emerald-700"
-          style={{
-            left: `${leftPct}%`,
-            width: `${Math.max(0, rightPct - leftPct)}%`,
-          }}
+          style={{ left: `${leftPct}%`, width: `${Math.max(0, rightPct - leftPct)}%` }}
         />
 
         <button
@@ -254,178 +242,45 @@ function RangeSlider(props: {
 
 function estimateTaxRatePct(listing: (typeof LISTINGS)[number]) {
   let rate = 1.02
-
   const city = listing.city.toLowerCase()
   if (city.includes("seattle")) rate -= 0.05
   if (city.includes("bellevue")) rate += 0.06
   if (city.includes("kirkland")) rate += 0.03
   if (city.includes("sammamish")) rate += 0.02
   if (city.includes("renton")) rate += 0.01
-
   if (listing.type === "Condo") rate -= 0.03
-
   return clamp(rate, 0.85, 1.35)
 }
 
 function estimateInsuranceMonthly(listing: (typeof LISTINGS)[number]) {
   let annualPct = 0.0032
-
   if (listing.type === "Condo") annualPct = 0.0020
   if (listing.type === "Townhome") annualPct = 0.0026
-
-
+  // Houses remain baseline
   const price = listing.price
   if (price < 600000) annualPct += 0.0004
   if (price > 1200000) annualPct -= 0.0004
-
   const annual = price * annualPct
   return Math.round(annual / 12 / 10) * 10
 }
 
-/** ---------- Metric card w/ hover tooltip ---------- */
+/** ---------- Hover popover that won’t clip ---------- */
 
-function MetricCard(props: {
-  label: string
-  value: string
-  valueClass?: string
-  hoverTitle?: string
-  hoverBody?: React.ReactNode
-}) {
-  const hasHover = Boolean(props.hoverBody)
-
+function HoverCard(props: { anchor: React.ReactNode; children: React.ReactNode; width?: number }) {
+  // Important: wrapper must be overflow-visible and positioned
   return (
     <div className="relative overflow-visible">
-      <div className={cn("rounded-lg border border-zinc-200 bg-white p-3", hasHover && "group/metric cursor-help")}>
-        <div className="text-xs text-zinc-600">{props.label}</div>
-        <div className={cn("mt-1 text-sm font-semibold", props.valueClass ?? "text-zinc-900")}>{props.value}</div>
-
-        {hasHover && (
-          <div className="pointer-events-none absolute right-0 top-full z-[200] mt-2 hidden w-[340px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover/metric:block">
-            <div className="text-xs font-semibold text-zinc-900">{props.hoverTitle ?? props.label}</div>
-            <div className="mt-2">{props.hoverBody}</div>
-          </div>
-        )}
+      <div className="group inline-block overflow-visible">
+        {props.anchor}
+        <div
+          className="pointer-events-none absolute right-0 top-full z-[999] mt-2 hidden rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block"
+          style={{ width: props.width ?? 360 }}
+        >
+          {props.children}
+        </div>
       </div>
     </div>
   )
-}
-
-/** ---------- Condition pill + (fallback) heuristic classifier ---------- */
-
-const CONDITION_META: Record<
-  ConditionLabel,
-  { pillClass: string; title: string; description: string }
-> = {
-  Turnkey: {
-    pillClass: "bg-emerald-100 text-emerald-900 border-emerald-200",
-    title: "Turnkey",
-    description: "Fully ready to move in or rent out without changing a thing.",
-  },
-  "Minor Fixer Upper": {
-    pillClass: "bg-blue-100 text-blue-900 border-blue-200",
-    title: "Minor Fixer Upper",
-    description: "May need a few cosmetic improvements, but is generally move in ready.",
-  },
-  "Major Fixer Upper": {
-    pillClass: "bg-rose-100 text-rose-900 border-rose-200",
-    title: "Major Fixer Upper",
-    description: "Needs major renovations to be move in ready or rentable.",
-  },
-  "State Unknown": {
-    pillClass: "bg-zinc-100 text-zinc-800 border-zinc-200",
-    title: "State Unknown",
-    description: "Not enough signal from photos or description to confidently classify.",
-  },
-}
-
-function ConditionPill(props: { value: ConditionLabel }) {
-  const meta = CONDITION_META[props.value]
-  return (
-    <div className="relative group/cond inline-flex">
-      <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", meta.pillClass)}>
-        {meta.title}
-      </span>
-
-      <div className="pointer-events-none absolute left-0 top-full z-[200] mt-2 hidden w-[280px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover/cond:block">
-        <div className="text-xs font-semibold text-zinc-900">{meta.title}</div>
-        <div className="mt-1">{meta.description}</div>
-      </div>
-    </div>
-  )
-}
-
-// This is ONLY a fallback so the UI works immediately.
-// When you add real AI in /api/condition, that will override this.
-function heuristicConditionFromText(text: string): ConditionLabel {
-  const t = (text || "").toLowerCase()
-
-  const majorSignals = [
-    "investor special",
-    "cash only",
-    "needs work",
-    "foundation",
-    "mold",
-    "water damage",
-    "fire damage",
-    "gut",
-    "tear down",
-    "as-is",
-    "as is",
-    "rehab",
-    "renovation project",
-    "fixer",
-    "contractor",
-    "bring your tools",
-    "demo",
-    "unfinished",
-    "roof needs",
-    "plumbing",
-    "electrical",
-  ]
-
-  const minorSignals = [
-    "cosmetic",
-    "paint",
-    "carpet",
-    "flooring",
-    "needs updating",
-    "dated",
-    "original kitchen",
-    "original bath",
-    "tlc",
-    "needs some love",
-    "handyman",
-    "deferred maintenance",
-    "newer roof",
-    "new windows",
-    "ready for your personal touches",
-  ]
-
-  const turnkeySignals = [
-    "fully renovated",
-    "remodeled",
-    "new kitchen",
-    "new bathrooms",
-    "move-in ready",
-    "turnkey",
-    "updated throughout",
-    "fresh paint",
-    "new flooring",
-    "stainless",
-    "quartz",
-    "designer",
-    "like new",
-    "beautifully maintained",
-  ]
-
-  const hasMajor = majorSignals.some((k) => t.includes(k))
-  const hasMinor = minorSignals.some((k) => t.includes(k))
-  const hasTurnkey = turnkeySignals.some((k) => t.includes(k))
-
-  if (hasMajor) return "Major Fixer Upper"
-  if (hasTurnkey && !hasMinor) return "Turnkey"
-  if (hasMinor) return "Minor Fixer Upper"
-  return "State Unknown"
 }
 
 /** ---------- Page ---------- */
@@ -442,10 +297,18 @@ export default function Home() {
   const [filtersOpen, setFiltersOpen] = useState(true)
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
+  // New: Beds/Baths/Type filters
+  const [bedsMin, setBedsMin] = useState<number>(0) // 0 = any
+  const [bathsMin, setBathsMin] = useState<number>(0) // 0 = any
+  const [types, setTypes] = useState<Record<ListingType, boolean>>({
+    House: true,
+    Condo: true,
+    Townhome: true,
+  })
+
+  // Down payment input
   const [dpMode, setDpMode] = useState<DownPaymentMode>("percent")
   const [dpInput, setDpInput] = useState(Math.round(DEFAULT_SCENARIO.downPaymentPct * 100))
-
-  const [conditionById, setConditionById] = useState<Record<number, ConditionLabel>>({})
 
   const basePriceForDownPayment = useMemo(() => {
     const prices = LISTINGS.map((l) => l.price).slice().sort((a, b) => a - b)
@@ -466,7 +329,8 @@ export default function Home() {
         insuranceMonthly: estimateInsuranceMonthly(l),
       }
       const u = underwriting({ price: l.price, rentMonthly: l.rentEstimate, scenario: s })
-      return u.mortgage
+      // “Mortgage” slider here means “All-in payment” (P&I + tax + ins + HOA) for filtering
+      return u.mortgage + u.taxesMonthly + u.insuranceMonthly + u.hoaMonthly
     })
 
     const min = (arr: number[]) => Math.min(...arr)
@@ -479,19 +343,20 @@ export default function Home() {
       rentMax: max(rents),
       hoaMin: min(hoas),
       hoaMax: max(hoas),
-      mortgageMin: min(mortgages),
-      mortgageMax: max(mortgages),
+      paymentMin: min(mortgages),
+      paymentMax: max(mortgages),
     }
   }, [scenario])
 
+  // Range state
   const [priceMin, setPriceMin] = useState(0)
   const [priceMax, setPriceMax] = useState(0)
   const [rentMin, setRentMin] = useState(0)
   const [rentMax, setRentMax] = useState(0)
   const [hoaMin, setHoaMin] = useState(0)
   const [hoaMax, setHoaMax] = useState(0)
-  const [mortgageMin, setMortgageMin] = useState(0)
-  const [mortgageMax, setMortgageMax] = useState(0)
+  const [paymentMin, setPaymentMin] = useState(0)
+  const [paymentMax, setPaymentMax] = useState(0)
 
   const [minCashFlow, setMinCashFlow] = useState(0)
 
@@ -520,12 +385,12 @@ export default function Home() {
       setHoaMax((v) => clamp(v, stats.hoaMin, stats.hoaMax))
     }
 
-    if (mortgageMin === 0 && mortgageMax === 0) {
-      setMortgageMin(stats.mortgageMin)
-      setMortgageMax(stats.mortgageMax)
+    if (paymentMin === 0 && paymentMax === 0) {
+      setPaymentMin(stats.paymentMin)
+      setPaymentMax(stats.paymentMax)
     } else {
-      setMortgageMin((v) => clamp(v, stats.mortgageMin, stats.mortgageMax))
-      setMortgageMax((v) => clamp(v, stats.mortgageMin, stats.mortgageMax))
+      setPaymentMin((v) => clamp(v, stats.paymentMin, stats.paymentMax))
+      setPaymentMax((v) => clamp(v, stats.paymentMin, stats.paymentMax))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stats])
@@ -564,24 +429,32 @@ export default function Home() {
       }
 
       const u = underwriting({ price: l.price, rentMonthly: l.rentEstimate, scenario: s })
-      const otherCosts =
-        u.taxesMonthly + u.insuranceMonthly + u.hoaMonthly + u.vacancy + u.management + u.maintenance
 
-      return { listing: l, u, otherCosts, estTaxRatePct, estInsuranceMonthly }
+      // “Payment” = mortgage (P&I) + tax + insurance + HOA (NO vacancy/management/maintenance)
+      const allInPayment = u.mortgage + u.taxesMonthly + u.insuranceMonthly + u.hoaMonthly
+      const rentMinusPayment = l.rentEstimate - allInPayment
+
+      // Cash flow already includes vacancy/management/maintenance (reserves)
+      return { listing: l, u, allInPayment, rentMinusPayment, estTaxRatePct, estInsuranceMonthly }
     })
 
-    const filtered = computed.filter(({ listing, u }) => {
+    const filtered = computed.filter(({ listing, u, allInPayment }) => {
       const priceOk = listing.price >= priceMin && listing.price <= priceMax
       const rentOk = listing.rentEstimate >= rentMin && listing.rentEstimate <= rentMax
 
       const hoa = listing.hoaMonthly ?? 0
       const hoaOk = hoa >= hoaMin && hoa <= hoaMax
 
-      const mortgageOk = u.mortgage >= mortgageMin && u.mortgage <= mortgageMax
+      const paymentOk = allInPayment >= paymentMin && allInPayment <= paymentMax
       const cashFlowOk = minCashFlow ? u.cashFlow >= minCashFlow : true
       const favOk = onlyFavorites ? favorites.includes(listing.id) : true
 
-      return priceOk && rentOk && hoaOk && mortgageOk && cashFlowOk && favOk
+      const bedsOk = bedsMin ? listing.beds >= bedsMin : true
+      const bathsOk = bathsMin ? listing.baths >= bathsMin : true
+
+      const typeOk = types[listing.type] === true
+
+      return priceOk && rentOk && hoaOk && paymentOk && cashFlowOk && favOk && bedsOk && bathsOk && typeOk
     })
 
     const sorted = [...filtered].sort((a, b) => {
@@ -606,11 +479,14 @@ export default function Home() {
     rentMax,
     hoaMin,
     hoaMax,
-    mortgageMin,
-    mortgageMax,
+    paymentMin,
+    paymentMax,
     minCashFlow,
     onlyFavorites,
     favorites,
+    bedsMin,
+    bathsMin,
+    types,
   ])
 
   const mapPoints = useMemo(() => {
@@ -655,13 +531,24 @@ export default function Home() {
       })
     }
 
-    if (mortgageMin !== stats.mortgageMin || mortgageMax !== stats.mortgageMax) {
+    if (paymentMin !== stats.paymentMin || paymentMax !== stats.paymentMax) {
       chips.push({
-        label: `Mortgage ${fmtMoney(mortgageMin)}—${fmtMoney(mortgageMax)}`,
+        label: `All-in payment ${fmtMoney(paymentMin)}—${fmtMoney(paymentMax)}`,
         clear: () => {
-          setMortgageMin(stats.mortgageMin)
-          setMortgageMax(stats.mortgageMax)
+          setPaymentMin(stats.paymentMin)
+          setPaymentMax(stats.paymentMax)
         },
+      })
+    }
+
+    if (bedsMin) chips.push({ label: `Beds ≥ ${bedsMin}`, clear: () => setBedsMin(0) })
+    if (bathsMin) chips.push({ label: `Baths ≥ ${bathsMin}`, clear: () => setBathsMin(0) })
+
+    const typeOff = (Object.keys(types) as ListingType[]).filter((t) => !types[t])
+    if (typeOff.length > 0 && typeOff.length < 3) {
+      chips.push({
+        label: `Type: ${(Object.keys(types) as ListingType[]).filter((t) => types[t]).join(", ")}`,
+        clear: () => setTypes({ House: true, Condo: true, Townhome: true }),
       })
     }
 
@@ -676,8 +563,11 @@ export default function Home() {
     rentMax,
     hoaMin,
     hoaMax,
-    mortgageMin,
-    mortgageMax,
+    paymentMin,
+    paymentMax,
+    bedsMin,
+    bathsMin,
+    types,
     minCashFlow,
     onlyFavorites,
     stats,
@@ -690,46 +580,14 @@ export default function Home() {
     setRentMax(stats.rentMax)
     setHoaMin(stats.hoaMin)
     setHoaMax(stats.hoaMax)
-    setMortgageMin(stats.mortgageMin)
-    setMortgageMax(stats.mortgageMax)
+    setPaymentMin(stats.paymentMin)
+    setPaymentMax(stats.paymentMax)
+    setBedsMin(0)
+    setBathsMin(0)
+    setTypes({ House: true, Condo: true, Townhome: true })
     setMinCashFlow(0)
     setOnlyFavorites(false)
   }
-
-  async function ensureCondition(listingId: number) {
-    if (conditionById[listingId]) return
-
-    const key = `cond:${listingId}`
-    const cached = typeof window !== "undefined" ? window.localStorage.getItem(key) : null
-    if (cached) {
-      setConditionById((m) => ({ ...m, [listingId]: cached as ConditionLabel }))
-      return
-    }
-
-    const listing = LISTINGS.find((l) => l.id === listingId)
-    const fallback = heuristicConditionFromText(listing?.description ?? "")
-
-    // optimistic set so UI is immediate
-    setConditionById((m) => ({ ...m, [listingId]: fallback }))
-    window.localStorage.setItem(key, fallback)
-
-    // Try server AI route if you add it later
-    try {
-      const res = await fetch(`/api/condition?listingId=${listingId}`)
-      if (!res.ok) return
-      const data = (await res.json()) as { label: ConditionLabel }
-      setConditionById((m) => ({ ...m, [listingId]: data.label }))
-      window.localStorage.setItem(key, data.label)
-    } catch {
-      // ignore, keep fallback
-    }
-  }
-
-  useEffect(() => {
-    // classify top visible results so badges populate quickly
-    rows.slice(0, 12).forEach(({ listing }) => ensureCondition(listing.id))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-zinc-50 to-white">
@@ -739,9 +597,7 @@ export default function Home() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-zinc-900">King County Investment Finder</h1>
-              <p className="mt-1 text-sm text-zinc-700">
-                Two-wide Realtor style grid. Cash flow first. Condition badge for rehab effort.
-              </p>
+              <p className="mt-1 text-sm text-zinc-700">Scan deals fast. Sort by performance. Adjust assumptions to match your strategy.</p>
               <p className="mt-1 text-xs text-zinc-500">{favorites.length} saved properties</p>
             </div>
 
@@ -777,373 +633,460 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Sticky controls */}
-        <div className="sticky top-4 z-30 mt-6 space-y-4">
-          <div className="rounded-xl border border-emerald-100 bg-white p-3 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="text-xs font-semibold text-zinc-700">
-                  Showing {rows.length} result{rows.length === 1 ? "" : "s"}
+        {/* Sticky controls (solid backdrop + divider so you can't see listings behind) */}
+        <div className="sticky top-0 z-40 mt-6">
+          <div className="rounded-xl border border-emerald-100 bg-white/95 backdrop-blur shadow-sm">
+            {/* Results + chips */}
+            <div className="p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-xs font-semibold text-zinc-700">
+                    Showing {rows.length} result{rows.length === 1 ? "" : "s"}
+                  </div>
+
+                  {activeChips.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {activeChips.map((c) => (
+                        <Chip key={c.label} label={`✕ ${c.label}`} onClick={c.clear} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-zinc-500">No filters applied</div>
+                  )}
                 </div>
 
-                {activeChips.length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {activeChips.map((c) => (
-                      <Chip key={c.label} label={`✕ ${c.label}`} onClick={c.clear} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-xs text-zinc-500">No filters applied</div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-zinc-700">
-                  <input
-                    type="checkbox"
-                    checked={onlyFavorites}
-                    onChange={(e) => setOnlyFavorites(e.target.checked)}
-                    className="accent-emerald-800"
-                  />
-                  Favorites only
-                </label>
-                <GhostButton onClick={clearAll}>Clear all</GhostButton>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                    <input
+                      type="checkbox"
+                      checked={onlyFavorites}
+                      onChange={(e) => setOnlyFavorites(e.target.checked)}
+                      className="accent-emerald-800"
+                    />
+                    Favorites only
+                  </label>
+                  <GhostButton onClick={clearAll}>Clear all</GhostButton>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Filters + Assumptions */}
-          <div className="grid gap-4 lg:grid-cols-12">
-            {/* Filters */}
-            <div className="lg:col-span-8">
-              <div className="overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen((v) => !v)}
-                  className="flex w-full items-center justify-between px-4 py-3 hover:bg-zinc-50"
-                >
-                  <div className="text-sm font-semibold text-zinc-900">Filters</div>
-                  <Chevron open={filtersOpen} />
-                </button>
+            <div className="border-t border-zinc-100" />
 
-                {filtersOpen && (
-                  <div className="border-t border-zinc-100 p-4">
-                    <div className="flex items-center justify-end pb-3">
-                      <button
-                        onClick={() => {
-                          setPriceMin(stats.priceMin)
-                          setPriceMax(stats.priceMax)
-                          setRentMin(stats.rentMin)
-                          setRentMax(stats.rentMax)
-                          setHoaMin(stats.hoaMin)
-                          setHoaMax(stats.hoaMax)
-                          setMortgageMin(stats.mortgageMin)
-                          setMortgageMax(stats.mortgageMax)
-                          setMinCashFlow(0)
-                          setOnlyFavorites(false)
-                        }}
-                        className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
-                        type="button"
-                      >
-                        Reset ranges
-                      </button>
-                    </div>
+            {/* Filters + Assumptions */}
+            <div className="grid gap-4 p-3 lg:grid-cols-12">
+              {/* Filters */}
+              <div className="lg:col-span-8">
+                <div className="rounded-xl border border-emerald-100 bg-white shadow-sm overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen((v) => !v)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-50"
+                  >
+                    <div className="text-sm font-semibold text-zinc-900">Filters</div>
+                    <Chevron open={filtersOpen} />
+                  </button>
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <RangeSlider
-                        label="Price"
-                        min={stats.priceMin}
-                        max={stats.priceMax}
-                        step={5000}
-                        valueMin={priceMin}
-                        valueMax={priceMax}
-                        onChange={(a, b) => {
-                          setPriceMin(a)
-                          setPriceMax(b)
-                        }}
-                        format={fmtMoney}
-                      />
-
-                      <RangeSlider
-                        label="Rent"
-                        min={stats.rentMin}
-                        max={stats.rentMax}
-                        step={50}
-                        valueMin={rentMin}
-                        valueMax={rentMax}
-                        onChange={(a, b) => {
-                          setRentMin(a)
-                          setRentMax(b)
-                        }}
-                        format={fmtMoney}
-                      />
-
-                      <RangeSlider
-                        label="HOA"
-                        min={stats.hoaMin}
-                        max={stats.hoaMax}
-                        step={5}
-                        valueMin={hoaMin}
-                        valueMax={hoaMax}
-                        onChange={(a, b) => {
-                          setHoaMin(a)
-                          setHoaMax(b)
-                        }}
-                        format={fmtMoney}
-                      />
-
-                      <RangeSlider
-                        label="Mortgage"
-                        min={stats.mortgageMin}
-                        max={stats.mortgageMax}
-                        step={25}
-                        valueMin={mortgageMin}
-                        valueMax={mortgageMax}
-                        onChange={(a, b) => {
-                          setMortgageMin(a)
-                          setMortgageMax(b)
-                        }}
-                        format={fmtMoney}
-                      />
-
-                      <div className="sm:col-span-2">
-                        <NumberField
-                          label="Cash flow min"
-                          value={minCashFlow}
-                          onChange={setMinCashFlow}
-                          placeholder="e.g. 200"
-                        />
+                  {filtersOpen && (
+                    <div className="border-t border-zinc-100 p-4">
+                      <div className="flex items-center justify-between pb-3">
+                        <div className="text-xs font-semibold text-zinc-700">Quick filters</div>
+                        <button
+                          onClick={() => {
+                            setPriceMin(stats.priceMin)
+                            setPriceMax(stats.priceMax)
+                            setRentMin(stats.rentMin)
+                            setRentMax(stats.rentMax)
+                            setHoaMin(stats.hoaMin)
+                            setHoaMax(stats.hoaMax)
+                            setPaymentMin(stats.paymentMin)
+                            setPaymentMax(stats.paymentMax)
+                            setBedsMin(0)
+                            setBathsMin(0)
+                            setTypes({ House: true, Condo: true, Townhome: true })
+                            setMinCashFlow(0)
+                            setOnlyFavorites(false)
+                          }}
+                          className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+                          type="button"
+                        >
+                          Reset filters
+                        </button>
                       </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Assumptions */}
-            <div className="lg:col-span-4">
-              <div className="overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setAssumptionsOpen((v) => !v)}
-                  className="flex w-full items-center justify-between px-4 py-3 hover:bg-zinc-50"
-                >
-                  <div className="text-sm font-semibold text-zinc-900">Assumptions</div>
-                  <Chevron open={assumptionsOpen} />
-                </button>
-
-                {assumptionsOpen && (
-                  <div className="border-t border-zinc-100 p-4">
-                    <div className="flex items-center justify-end pb-3">
-                      <button
-                        onClick={() => setScenario(DEFAULT_SCENARIO)}
-                        className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
-                        type="button"
-                      >
-                        Reset
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4">
-                      <NumberField
-                        label="Interest rate"
-                        value={scenario.interestRatePct}
-                        onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
-                        placeholder="e.g. 6.75"
-                        suffix="%"
-                      />
-
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs font-medium text-zinc-600">Down payment</div>
-                          <button
-                            type="button"
-                            onClick={() => setDpMode((m) => (m === "percent" ? "amount" : "percent"))}
-                            className="text-[11px] font-semibold text-emerald-800 underline"
+                      {/* Beds / Baths / Type */}
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div className="space-y-1">
+                          <div className="text-xs font-medium text-zinc-600">Beds</div>
+                          <select
+                            value={bedsMin}
+                            onChange={(e) => setBedsMin(Number(e.target.value))}
+                            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                           >
-                            Use {dpMode === "percent" ? "$ amount" : "%"}
-                          </button>
+                            <option value={0}>Any</option>
+                            <option value={1}>1+</option>
+                            <option value={2}>2+</option>
+                            <option value={3}>3+</option>
+                            <option value={4}>4+</option>
+                            <option value={5}>5+</option>
+                          </select>
                         </div>
 
-                        <NumberField
-                          label={dpMode === "percent" ? "Percent" : "Amount"}
-                          value={dpInput}
-                          onChange={setDpInput}
-                          placeholder={dpMode === "percent" ? "e.g. 20" : "e.g. 150000"}
-                          suffix={dpMode === "percent" ? "%" : "$"}
-                          smallHint={
-                            dpMode === "percent"
-                              ? `≈ ${fmtMoney(basePriceForDownPayment * (dpInput / 100))} on ${fmtMoney(basePriceForDownPayment)}`
-                              : `≈ ${((dpInput / basePriceForDownPayment) * 100).toFixed(1)}% on ${fmtMoney(basePriceForDownPayment)}`
-                          }
-                        />
+                        <div className="space-y-1">
+                          <div className="text-xs font-medium text-zinc-600">Baths</div>
+                          <select
+                            value={bathsMin}
+                            onChange={(e) => setBathsMin(Number(e.target.value))}
+                            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                          >
+                            <option value={0}>Any</option>
+                            <option value={1}>1+</option>
+                            <option value={1.5}>1.5+</option>
+                            <option value={2}>2+</option>
+                            <option value={2.5}>2.5+</option>
+                            <option value={3}>3+</option>
+                          </select>
+                        </div>
 
-                        <div className="text-[11px] text-zinc-500">
-                          Tax + insurance are estimated per listing (demo heuristic).
+                        <div className="space-y-1">
+                          <div className="text-xs font-medium text-zinc-600">Type</div>
+                          <div className="flex flex-wrap gap-2">
+                            {(Object.keys(types) as ListingType[]).map((t) => (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => setTypes((prev) => ({ ...prev, [t]: !prev[t] }))}
+                                className={cn(
+                                  "rounded-full border px-3 py-1 text-xs font-semibold",
+                                  types[t]
+                                    ? "border-emerald-800 bg-emerald-800 text-white"
+                                    : "border-zinc-200 bg-white text-zinc-700 hover:border-emerald-300"
+                                )}
+                              >
+                                {t}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="border-t border-zinc-100 pt-4">
-                        <div className="text-xs font-semibold text-zinc-600">Operating reserves</div>
+                      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <RangeSlider
+                          label="Price"
+                          min={stats.priceMin}
+                          max={stats.priceMax}
+                          step={5000}
+                          valueMin={priceMin}
+                          valueMax={priceMax}
+                          onChange={(a, b) => {
+                            setPriceMin(a)
+                            setPriceMax(b)
+                          }}
+                          format={fmtMoney}
+                        />
 
-                        <div className="mt-3 space-y-4">
-                          <SliderRow
-                            label="Vacancy"
-                            valueLabel={`${Math.round(scenario.vacancyPct * 100)}%`}
-                            min={0}
-                            max={15}
-                            step={1}
-                            value={Math.round(scenario.vacancyPct * 100)}
-                            onChange={(v) => setScenario({ ...scenario, vacancyPct: v / 100 })}
-                          />
-                          <SliderRow
-                            label="Management"
-                            valueLabel={`${Math.round(scenario.managementPct * 100)}%`}
-                            min={0}
-                            max={15}
-                            step={1}
-                            value={Math.round(scenario.managementPct * 100)}
-                            onChange={(v) => setScenario({ ...scenario, managementPct: v / 100 })}
-                          />
-                          <SliderRow
-                            label="Maintenance"
-                            valueLabel={`${Math.round(scenario.maintenancePct * 100)}%`}
-                            min={0}
-                            max={20}
-                            step={1}
-                            value={Math.round(scenario.maintenancePct * 100)}
-                            onChange={(v) => setScenario({ ...scenario, maintenancePct: v / 100 })}
+                        <RangeSlider
+                          label="Rent"
+                          min={stats.rentMin}
+                          max={stats.rentMax}
+                          step={50}
+                          valueMin={rentMin}
+                          valueMax={rentMax}
+                          onChange={(a, b) => {
+                            setRentMin(a)
+                            setRentMax(b)
+                          }}
+                          format={fmtMoney}
+                        />
+
+                        <RangeSlider
+                          label="HOA"
+                          min={stats.hoaMin}
+                          max={stats.hoaMax}
+                          step={5}
+                          valueMin={hoaMin}
+                          valueMax={hoaMax}
+                          onChange={(a, b) => {
+                            setHoaMin(a)
+                            setHoaMax(b)
+                          }}
+                          format={fmtMoney}
+                        />
+
+                        <RangeSlider
+                          label="All-in payment (PITI + HOA)"
+                          min={stats.paymentMin}
+                          max={stats.paymentMax}
+                          step={25}
+                          valueMin={paymentMin}
+                          valueMax={paymentMax}
+                          onChange={(a, b) => {
+                            setPaymentMin(a)
+                            setPaymentMax(b)
+                          }}
+                          format={fmtMoney}
+                        />
+
+                        <div className="sm:col-span-2">
+                          <NumberField
+                            label="Cash flow min"
+                            value={minCashFlow}
+                            onChange={setMinCashFlow}
+                            placeholder="e.g. 200"
                           />
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              </div>
+
+              {/* Assumptions */}
+              <div className="lg:col-span-4">
+                <div className="rounded-xl border border-emerald-100 bg-white shadow-sm overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setAssumptionsOpen((v) => !v)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-50"
+                  >
+                    <div className="text-sm font-semibold text-zinc-900">Assumptions</div>
+                    <Chevron open={assumptionsOpen} />
+                  </button>
+
+                  {assumptionsOpen && (
+                    <div className="border-t border-zinc-100 p-4">
+                      <div className="flex items-center justify-end pb-3">
+                        <button
+                          onClick={() => setScenario(DEFAULT_SCENARIO)}
+                          className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+                          type="button"
+                        >
+                          Reset
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4">
+                        <NumberField
+                          label="Interest rate"
+                          value={scenario.interestRatePct}
+                          onChange={(v) => setScenario({ ...scenario, interestRatePct: v })}
+                          placeholder="e.g. 6.75"
+                          suffix="%"
+                        />
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs font-medium text-zinc-600">Down payment</div>
+                            <button
+                              type="button"
+                              onClick={() => setDpMode((m) => (m === "percent" ? "amount" : "percent"))}
+                              className="text-[11px] font-semibold text-emerald-800 underline"
+                            >
+                              Use {dpMode === "percent" ? "$ amount" : "%"}
+                            </button>
+                          </div>
+
+                          <NumberField
+                            label={dpMode === "percent" ? "Percent" : "Amount"}
+                            value={dpInput}
+                            onChange={setDpInput}
+                            placeholder={dpMode === "percent" ? "e.g. 20" : "e.g. 150000"}
+                            suffix={dpMode === "percent" ? "%" : "$"}
+                            smallHint={
+                              dpMode === "percent"
+                                ? `≈ ${fmtMoney(basePriceForDownPayment * (dpInput / 100))} on ${fmtMoney(basePriceForDownPayment)}`
+                                : `≈ ${((dpInput / basePriceForDownPayment) * 100).toFixed(1)}% on ${fmtMoney(basePriceForDownPayment)}`
+                            }
+                          />
+
+                          <div className="text-[11px] text-zinc-500">
+                            Tax + insurance are estimated per listing (demo heuristic).
+                          </div>
+                        </div>
+
+                        <div className="border-t border-zinc-100 pt-4">
+                          <div className="text-xs font-semibold text-zinc-600">Operating reserves</div>
+
+                          <div className="mt-3 space-y-4">
+                            <SliderRow
+                              label="Vacancy"
+                              valueLabel={`${Math.round(scenario.vacancyPct * 100)}%`}
+                              min={0}
+                              max={15}
+                              step={1}
+                              value={Math.round(scenario.vacancyPct * 100)}
+                              onChange={(v) => setScenario({ ...scenario, vacancyPct: v / 100 })}
+                            />
+                            <SliderRow
+                              label="Management"
+                              valueLabel={`${Math.round(scenario.managementPct * 100)}%`}
+                              min={0}
+                              max={15}
+                              step={1}
+                              value={Math.round(scenario.managementPct * 100)}
+                              onChange={(v) => setScenario({ ...scenario, managementPct: v / 100 })}
+                            />
+                            <SliderRow
+                              label="Maintenance"
+                              valueLabel={`${Math.round(scenario.maintenancePct * 100)}%`}
+                              min={0}
+                              max={20}
+                              step={1}
+                              value={Math.round(scenario.maintenancePct * 100)}
+                              onChange={(v) => setScenario({ ...scenario, maintenancePct: v / 100 })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Bottom divider like Realtor */}
+            <div className="border-t border-zinc-200" />
           </div>
         </div>
 
         {/* Main content */}
         <div className="mt-6">
           {viewMode === "list" ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {rows.map(({ listing, u, estInsuranceMonthly, estTaxRatePct }) => {
+            <div className="grid gap-4 sm:grid-cols-2">
+              {rows.map(({ listing, u, allInPayment, rentMinusPayment, estInsuranceMonthly, estTaxRatePct }) => {
                 const isSaved = favorites.includes(listing.id)
                 const cashFlowColor = u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
-                const cond = conditionById[listing.id] ?? "State Unknown"
+                const deltaColor = rentMinusPayment >= 0 ? "text-emerald-700" : "text-rose-600"
 
                 return (
-                  <Link
-                    key={listing.id}
-                    href={`/listing/${String(listing.id)}`}
-                    className="group overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md"
-                    onMouseEnter={() => ensureCondition(listing.id)}
-                  >
-                    {/* Photo */}
-                    <div className="relative h-60 w-full overflow-hidden bg-zinc-100">
-                      <img
-                        src={listing.images[0]}
-                        alt="Listing"
-                        className="h-full w-full object-cover transition group-hover:scale-[1.02]"
-                      />
+                  <div key={listing.id} className="overflow-visible">
+                    <Link
+                      href={`/listing/${String(listing.id)}`}
+                      className="block overflow-visible rounded-xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-md"
+                    >
+                      {/* Image */}
+                      <div className="relative h-56 w-full overflow-hidden rounded-t-xl">
+                        <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
 
-                      <div className="absolute left-3 top-3">
-                        <ConditionPill value={cond} />
+                        {/* Save */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            const next = toggleFavorite(listing.id)
+                            setFavorites(next)
+                          }}
+                          className={cn(
+                            "absolute right-3 top-3 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm",
+                            isSaved
+                              ? "border-emerald-800 bg-emerald-800 text-white"
+                              : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
+                          )}
+                        >
+                          {isSaved ? "Saved" : "Save"}
+                        </button>
                       </div>
 
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          const next = toggleFavorite(listing.id)
-                          setFavorites(next)
-                        }}
-                        className={cn(
-                          "absolute right-3 top-3 rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
-                          isSaved
-                            ? "border-emerald-800 bg-emerald-800 text-white"
-                            : "border-zinc-200 bg-white text-zinc-900 hover:border-emerald-300"
-                        )}
-                      >
-                        {isSaved ? "Saved" : "Save"}
-                      </button>
-                    </div>
-
-                    {/* Body */}
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-2xl font-extrabold text-zinc-900">{fmtMoney(listing.price)}</div>
-                          <div className="mt-1 text-sm text-zinc-700">
-                            {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
+                      {/* Content */}
+                      <div className="p-4 overflow-visible">
+                        <div className="flex items-start justify-between gap-4 overflow-visible">
+                          <div className="min-w-0">
+                            <div className="text-2xl font-bold text-zinc-900">{fmtMoney(listing.price)}</div>
+                            <div className="mt-1 text-sm text-zinc-700">
+                              {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-zinc-900 truncate">
+                              {listing.address}, {listing.city}
+                            </div>
                           </div>
-                          <div className="mt-1 truncate text-sm font-semibold text-zinc-900">
-                            {listing.address}, {listing.city}
+
+                          {/* Cash flow hover (NOT clipped) */}
+                          <HoverCard
+                            width={360}
+                            anchor={
+                              <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-right shadow-sm">
+                                <div className="text-xs text-zinc-600">Est cash flow</div>
+                                <div className={cn("text-sm font-bold", cashFlowColor)}>{fmtMoney(u.cashFlow)}/mo</div>
+                              </div>
+                            }
+                          >
+                            <div className="text-xs font-semibold text-zinc-900">Cash flow breakdown</div>
+                            <div className="mt-2 grid grid-cols-2 gap-y-1">
+                              <div>Rent</div>
+                              <div className="text-right font-semibold">{fmtMoney(listing.rentEstimate)}</div>
+
+                              <div>Mortgage (P&I)</div>
+                              <div className="text-right font-semibold">{fmtMoney(u.mortgage)}</div>
+
+                              <div>Taxes (est)</div>
+                              <div className="text-right font-semibold">
+                                {fmtMoney(u.taxesMonthly)}{" "}
+                                <span className="text-[10px] text-zinc-500">({estTaxRatePct.toFixed(2)}%)</span>
+                              </div>
+
+                              <div>Insurance (est)</div>
+                              <div className="text-right font-semibold">{fmtMoney(estInsuranceMonthly)}</div>
+
+                              <div>HOA</div>
+                              <div className="text-right font-semibold">{fmtMoney(u.hoaMonthly)}</div>
+
+                              <div>Vacancy</div>
+                              <div className="text-right font-semibold">{fmtMoney(u.vacancy)}</div>
+
+                              <div>Management</div>
+                              <div className="text-right font-semibold">{fmtMoney(u.management)}</div>
+
+                              <div>Maintenance</div>
+                              <div className="text-right font-semibold">{fmtMoney(u.maintenance)}</div>
+                            </div>
+
+                            <div className="mt-2 border-t pt-2 flex items-center justify-between">
+                              <div className="text-xs font-semibold text-zinc-900">Cash flow</div>
+                              <div className={cn("text-xs font-bold", cashFlowColor)}>{fmtMoney(u.cashFlow)}/mo</div>
+                            </div>
+                            <div className="mt-1 text-[10px] text-zinc-500">
+                              Payment includes P&I + tax + insurance + HOA. Cash flow also includes operating reserves.
+                            </div>
+                          </HoverCard>
+                        </div>
+
+                        <div className="mt-3 text-sm text-zinc-600 line-clamp-3">{listing.description}</div>
+
+                        {/* Investor metrics */}
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                            <div className="text-xs text-zinc-600">Rent − Payment</div>
+                            <div className={cn("mt-1 text-lg font-extrabold", deltaColor)}>{fmtMoney(rentMinusPayment)}/mo</div>
+                            <div className="mt-1 text-[11px] text-zinc-500">Rent minus PITI + HOA</div>
+                          </div>
+
+                          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                            <div className="text-xs text-zinc-600">Est cash flow</div>
+                            <div className={cn("mt-1 text-lg font-extrabold", cashFlowColor)}>{fmtMoney(u.cashFlow)}/mo</div>
+                            <div className="mt-1 text-[11px] text-zinc-500">Includes reserves</div>
                           </div>
                         </div>
 
-                        <MetricCard
-                          label="Est cash flow"
-                          value={`${fmtMoney(u.cashFlow)}/mo`}
-                          valueClass={cn("text-lg font-extrabold", cashFlowColor)}
-                          hoverTitle="Cash flow breakdown"
-                          hoverBody={
-                            <div className="space-y-2">
-                              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                                <div>Rent</div>
-                                <div className="text-right font-semibold">{fmtMoney(listing.rentEstimate)}</div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-zinc-700">
+                          <div className="rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+                            <div className="text-[11px] text-zinc-500">Est rent</div>
+                            <div className="font-semibold">{fmtMoney(listing.rentEstimate)}</div>
+                          </div>
+                          <div className="rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+                            <div className="text-[11px] text-zinc-500">Est payment</div>
+                            <div className="font-semibold">{fmtMoney(allInPayment)}</div>
+                          </div>
+                          <div className="rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+                            <div className="text-[11px] text-zinc-500">Type</div>
+                            <div className="font-semibold">{listing.type}</div>
+                          </div>
+                        </div>
 
-                                <div>Mortgage</div>
-                                <div className="text-right font-semibold">{fmtMoney(u.mortgage)}</div>
-
-                                <div>Taxes (est)</div>
-                                <div className="text-right font-semibold">
-                                  {fmtMoney(u.taxesMonthly)}
-                                  <span className="ml-1 text-[10px] text-zinc-500">({estTaxRatePct.toFixed(2)}%)</span>
-                                </div>
-
-                                <div>Insurance (est)</div>
-                                <div className="text-right font-semibold">{fmtMoney(estInsuranceMonthly)}</div>
-
-                                <div>HOA</div>
-                                <div className="text-right font-semibold">{fmtMoney(u.hoaMonthly)}</div>
-
-                                <div>Vacancy</div>
-                                <div className="text-right font-semibold">{fmtMoney(u.vacancy)}</div>
-
-                                <div>Management</div>
-                                <div className="text-right font-semibold">{fmtMoney(u.management)}</div>
-
-                                <div>Maintenance</div>
-                                <div className="text-right font-semibold">{fmtMoney(u.maintenance)}</div>
-                              </div>
-
-                              <div className="border-t pt-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="text-xs font-semibold text-zinc-900">Cash flow</div>
-                                  <div className={cn("text-xs font-bold", cashFlowColor)}>{fmtMoney(u.cashFlow)}</div>
-                                </div>
-                                <div className="mt-1 text-[10px] text-zinc-500">
-                                  Demo estimates. Plug in parcel taxes + real insurance later.
-                                </div>
-                              </div>
-                            </div>
-                          }
-                        />
+                        <div className="mt-3 text-[11px] text-zinc-500">
+                          CoC {fmtPct(u.cocReturnPct)} · Cap {fmtPct(u.capRatePct)}
+                        </div>
                       </div>
-
-                      {/* Small “Zillow-like” snippet */}
-                      <div className="mt-3 line-clamp-2 text-xs text-zinc-600">
-                        {listing.description}
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between text-xs text-zinc-500">
-                        <span>Type: {listing.type}</span>
-                        <span>HOA: {fmtMoney(listing.hoaMonthly ?? 0)}/mo</span>
-                      </div>
-                    </div>
-                  </Link>
+                    </Link>
+                  </div>
                 )
               })}
             </div>
@@ -1151,18 +1094,13 @@ export default function Home() {
             <div className="grid gap-4 lg:grid-cols-12">
               <div className="lg:col-span-7">
                 <ListingMap points={mapPoints} selectedId={selectedId} onSelect={(id) => setSelectedId(id)} />
-                {!selectedId && (
-                  <div className="mt-2 text-xs text-zinc-600">
-                    Pins show all filtered listings. Click a pin or hover a listing to focus.
-                  </div>
-                )}
+                {!selectedId && <div className="mt-2 text-xs text-zinc-600">Pins show all filtered listings. Click a pin to focus.</div>}
               </div>
 
               <div className="lg:col-span-5 space-y-3">
                 {rows.map(({ listing, u }) => {
                   const isSelected = listing.id === selectedId
                   const isSaved = favorites.includes(listing.id)
-                  const cond = conditionById[listing.id] ?? "State Unknown"
 
                   return (
                     <div
@@ -1172,10 +1110,7 @@ export default function Home() {
                         isSelected ? "border-emerald-800 ring-2 ring-emerald-100" : "border-emerald-100 hover:border-emerald-200"
                       )}
                       onClick={() => setSelectedId(listing.id)}
-                      onMouseEnter={() => {
-                        setSelectedId(listing.id)
-                        ensureCondition(listing.id)
-                      }}
+                      onMouseEnter={() => setSelectedId(listing.id)}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -1183,10 +1118,7 @@ export default function Home() {
                             {listing.address}, {listing.city}
                           </div>
                           <div className="mt-1 text-xs text-zinc-600">
-                            {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
-                          </div>
-                          <div className="mt-2">
-                            <ConditionPill value={cond} />
+                            {listing.type} · {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString()} sqft
                           </div>
                         </div>
 
@@ -1227,7 +1159,7 @@ export default function Home() {
           )}
 
           <div className="mt-10 text-xs text-zinc-500">
-            Demo data only. Condition pill uses fallback text heuristic now; you can later add AI in /api/condition.
+            Demo data only. Replace LISTINGS with real MLS/API data and parcel-based tax + insurance sources.
           </div>
         </div>
       </div>
@@ -1235,7 +1167,7 @@ export default function Home() {
   )
 }
 
-/** SliderRow (kept for reserves) */
+/** SliderRow */
 function SliderRow(props: {
   label: string
   valueLabel: string
