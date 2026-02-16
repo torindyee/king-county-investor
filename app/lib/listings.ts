@@ -1,4 +1,27 @@
-export const LISTINGS = [
+export type ListingType = "House" | "Condo" | "Townhome"
+
+export type Listing = {
+  id: number
+  address: string
+  city: string
+  state: string
+  zip: string
+  type: ListingType
+  beds: number
+  baths: number
+  sqft: number
+  yearBuilt?: number
+  price: number
+  rentEstimate: number
+  hoaMonthly: number
+  lat: number
+  lng: number
+  images: string[]
+  highlights: string[]
+  description: string
+}
+
+export const LISTINGS: readonly Listing[] = [
   {
     id: 1001,
     address: "7421 24th Ave NW",
@@ -275,4 +298,4 @@ export const LISTINGS = [
     description:
       "Downtown high-rise with modern finishes, quartz counters, and floor-to-ceiling windows. Like new, move-in ready, and turnkey for a furnished or long-term rental strategy.",
   },
-] as const
+] 
