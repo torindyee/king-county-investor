@@ -18,6 +18,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["Updated kitchen", "Quartz counters", "Fenced yard", "Garage", "Move-in ready"],
     description:
       "Move-in ready Ballard home with updated kitchen, quartz counters, stainless appliances, fresh paint, and new flooring. Bright living room, fenced yard, and garage. Updated throughout and well maintained.",
   },
@@ -40,6 +41,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["Water views", "Strong layout", "Clean but dated", "Great upside", "Convenient West Seattle"],
     description:
       "Waterfront condo with sweeping views. Kitchen and baths are original and a bit dated, but the unit is clean and fully functional. Ready for your personal touches, paint, and cosmetic updates.",
   },
@@ -62,6 +64,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["Fully remodeled", "Designer lighting", "New bathrooms", "Great natural light", "Turnkey"],
     description:
       "Fully remodeled home in a quiet neighborhood. New kitchen, new bathrooms, designer lighting, and updated throughout. Turnkey condition with great natural light and an easy layout for renting.",
   },
@@ -84,6 +87,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1572120360610-d971b9d7767c?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["As-is", "Needs renovations", "Value-add", "Roof older", "Investor special"],
     description:
       "Investor special. Home needs work and is sold as-is. Flooring and paint needed. Roof is older and buyer to verify condition. Great upside for a rehab project in an improving area.",
   },
@@ -106,6 +110,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["Well maintained", "Updated kitchen", "Newer roof", "Minor cosmetic upside", "Great layout"],
     description:
       "Beautifully maintained home with updated kitchen and newer roof. Minor cosmetic items like paint touch-ups and carpet replacement could add value, but generally move-in ready.",
   },
@@ -128,6 +133,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["Modern building", "Quartz counters", "Open layout", "Amenities", "Walkable location"],
     description:
       "Modern condo with open layout, stainless appliances, quartz counters, and newer building amenities. Like new and turnkey for renting. Strong location near restaurants and waterfront.",
   },
@@ -150,6 +156,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["Good bones", "Dated kitchen", "Needs flooring", "Paint needed", "Value-add potential"],
     description:
       "Solid home with good bones but dated kitchen and bathrooms. Needs updating, paint, and flooring. Great opportunity for a minor fixer to improve rentability and long-term value.",
   },
@@ -172,6 +179,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["Fresh interior paint", "Updated finishes", "Great for renting", "Near employers", "Turnkey"],
     description:
       "Well cared for townhome with updated finishes, newer appliances, and fresh interior paint. Move-in ready with minimal work. Ideal turnkey rental near major employers.",
   },
@@ -194,6 +202,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["West Seattle", "Livable now", "Cosmetic TLC", "Older bathrooms", "Great rental demand area"],
     description:
       "Classic West Seattle charm. Some deferred maintenance and cosmetic TLC needed. Bathrooms are older, kitchen could be refreshed, but home is livable and ready for incremental upgrades.",
   },
@@ -216,6 +225,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["As-is", "Possible water intrusion", "Major rehab", "Big upside", "Drainage remediation likely"],
     description:
       "Large home with strong layout. Sold as-is. Reports of prior water intrusion in basement and visible wear. Needs major renovation work including flooring, drywall, and possible drainage remediation.",
   },
@@ -238,6 +248,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["Remodeled kitchen", "Updated baths", "New flooring", "Fresh paint", "Turnkey"],
     description:
       "Tastefully updated with remodeled kitchen and baths, new flooring, and fresh paint. Clean inspection history per seller. Turnkey level condition with excellent renter appeal in Bellevue.",
   },
@@ -260,6 +271,7 @@ export const LISTINGS = [
     images: [
       "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1400&q=80",
     ],
+    highlights: ["High-rise views", "Modern finishes", "Quartz counters", "Amenities", "Turnkey"],
     description:
       "Downtown high-rise with modern finishes, quartz counters, and floor-to-ceiling windows. Like new, move-in ready, and turnkey for a furnished or long-term rental strategy.",
   },
