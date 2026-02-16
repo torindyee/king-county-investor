@@ -1,17 +1,4 @@
-> Build error occurred
-Error: Turbopack build failed with 1 errors:
-./app/page.tsx:1188:1
-Parsing ecmascript source code failed
-  1186 |     </div>
-  1187 |   )
-> 1188 | }
-       | ^
-  1189 |
-  1190 | /** SliderRow (kept for reserves) */
-  1191 | function SliderRow(props: {
-Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
-    at <unknown> (./app/page.tsx:1188:1)
-Error: Command "npm run build" exited with "use client"
+
 
 import Link from "next/link"
 import React, { useEffect, useMemo, useRef, useState } from "react"
