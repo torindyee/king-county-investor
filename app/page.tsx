@@ -10,6 +10,8 @@ import { getFavorites, toggleFavorite } from "./lib/favorites"
 type SortKey = "cashFlow" | "coc" | "cap" | "rentToPayment" | "price" | "rent"
 type DownPaymentMode = "percent" | "amount"
 
+type ConditionTag = "Turnkey" | "Minor Fixer Upper" | "Major Fixer Upper" | "State Unknown"
+
 const DEFAULT_SCENARIO: Scenario = {
   downPaymentPct: 0.25,
   interestRatePct: 6.75,
@@ -22,7 +24,7 @@ const DEFAULT_SCENARIO: Scenario = {
   maintenancePct: 0.07,
 }
 
-/** ---------- Utils / UI helpers ---------- */
+/** ---------- Utils ---------- */
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ")
@@ -110,12 +112,8 @@ function NumberField(props: {
   )
 }
 
-/**
- * "Two-handle" range slider:
- * - One slider for min
- * - One slider for max
- * - Guardrails prevent crossing
- */
+/** ---------- Range slider ---------- */
+
 function RangeSlider(props: {
   label: string
   min: number
@@ -199,12 +197,10 @@ function RangeSlider(props: {
           onPointerDown={onTrackPointerDown}
           className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 cursor-pointer rounded-full bg-zinc-200"
         />
-
         <div
           className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-emerald-700"
           style={{ left: `${leftPct}%`, width: `${Math.max(0, rightPct - leftPct)}%` }}
         />
-
         <button
           type="button"
           onPointerDown={(e) => {
@@ -216,7 +212,6 @@ function RangeSlider(props: {
           style={{ left: `${leftPct}%`, width: 18, height: 18 }}
           aria-label={`${props.label} minimum`}
         />
-
         <button
           type="button"
           onPointerDown={(e) => {
@@ -238,7 +233,7 @@ function RangeSlider(props: {
   )
 }
 
-/** ---------- Per-listing estimates (demo heuristic) ---------- */
+/** ---------- Estimates (demo heuristic) ---------- */
 
 function estimateTaxRatePct(listing: (typeof LISTINGS)[number]) {
   let rate = 1.02
@@ -256,7 +251,6 @@ function estimateInsuranceMonthly(listing: (typeof LISTINGS)[number]) {
   let annualPct = 0.0032
   if (listing.type === "Condo") annualPct = 0.0020
   if (listing.type === "Townhome") annualPct = 0.0026
-  // Houses remain baseline
   const price = listing.price
   if (price < 600000) annualPct += 0.0004
   if (price > 1200000) annualPct -= 0.0004
@@ -264,16 +258,96 @@ function estimateInsuranceMonthly(listing: (typeof LISTINGS)[number]) {
   return Math.round(annual / 12 / 10) * 10
 }
 
-/** ---------- Hover popover that won’t clip ---------- */
+/** ---------- Condition tag (heuristic now; swap with AI later) ---------- */
+/**
+ * IMPORTANT: We are NOT calling AI from the browser here.
+ * This is a placeholder heuristic. When you wire AI in:
+ * - create a server route (/app/api/condition/route.ts)
+ * - send listing.description + a few image URLs
+ * - cache results per listing id
+ */
+function inferConditionTag(listing: (typeof LISTINGS)[number]): { tag: ConditionTag; reason: string } {
+  const text = `${listing.description} ${listing.highlights.join(" ")}`.toLowerCase()
 
-function HoverCard(props: { anchor: React.ReactNode; children: React.ReactNode; width?: number }) {
-  // Important: wrapper must be overflow-visible and positioned
+  const majorSignals = [
+    "as-is",
+    "investor",
+    "water intrusion",
+    "rehab",
+    "foundation",
+    "mold",
+    "fire",
+    "sag",
+    "leak",
+    "damage",
+    "deferred",
+    "unfinished",
+    "remediation",
+  ]
+  const minorSignals = ["dated", "cosmetic", "touched up", "tlc", "refresh", "original", "needs updating", "opportunity"]
+  const turnkeySignals = ["new", "updated", "remodeled", "renovated", "like new", "move-in", "modern", "fresh"]
+
+  const majorHit = majorSignals.some((k) => text.includes(k))
+  const minorHit = minorSignals.some((k) => text.includes(k))
+  const turnkeyHit = turnkeySignals.some((k) => text.includes(k))
+
+  // If a listing never mentions condition at all, default to Unknown sometimes
+  const mentionsCondition = majorHit || minorHit || turnkeyHit
+
+  if (majorHit) return { tag: "Major Fixer Upper", reason: "Signals in description/highlights suggest significant repairs or unknown risks." }
+  if (turnkeyHit && !minorHit) return { tag: "Turnkey", reason: "Signals suggest updated or move-in ready condition." }
+  if (minorHit) return { tag: "Minor Fixer Upper", reason: "Signals suggest cosmetic updates or light refresh." }
+  if (!mentionsCondition) return { tag: "State Unknown", reason: "Listing text doesn’t indicate condition clearly. Photos/inspection would be needed." }
+
+  return { tag: "State Unknown", reason: "Condition signals are mixed or unclear." }
+}
+
+function ConditionBadge(props: { tag: ConditionTag; reason: string }) {
+  const styles: Record<ConditionTag, string> = {
+    Turnkey: "bg-emerald-100 text-emerald-900 border-emerald-200",
+    "Minor Fixer Upper": "bg-sky-100 text-sky-900 border-sky-200",
+    "Major Fixer Upper": "bg-rose-100 text-rose-900 border-rose-200",
+    "State Unknown": "bg-zinc-100 text-zinc-900 border-zinc-200",
+  }
+
+  const definitions: Record<ConditionTag, string> = {
+    Turnkey: "Fully ready to rent with minimal or no work needed.",
+    "Minor Fixer Upper": "Likely needs cosmetic improvements (paint, flooring, fixtures) but usable.",
+    "Major Fixer Upper": "Likely needs significant renovation or major systems work before renting.",
+    "State Unknown": "Insufficient info in the listing text. Rely on photos, disclosures, and inspection.",
+  }
+
+  return (
+    <div className="relative overflow-visible">
+      <div className="group inline-flex items-center overflow-visible">
+        <span className={cn("rounded-full border px-3 py-1 text-xs font-semibold", styles[props.tag])}>{props.tag}</span>
+
+        <div className="pointer-events-none absolute left-0 top-full z-[999] mt-2 hidden w-[340px] rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block">
+          <div className="text-xs font-semibold text-zinc-900">{props.tag}</div>
+          <div className="mt-1 text-[11px] text-zinc-600">{definitions[props.tag]}</div>
+          <div className="mt-2 border-t pt-2">
+            <div className="text-[11px] text-zinc-500">Why this label</div>
+            <div className="mt-1">{props.reason}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** ---------- Hover popover (won’t clip) ---------- */
+
+function HoverCard(props: { anchor: React.ReactNode; children: React.ReactNode; width?: number; align?: "left" | "right" }) {
+  const alignClass = props.align === "left" ? "left-0" : "right-0"
   return (
     <div className="relative overflow-visible">
       <div className="group inline-block overflow-visible">
         {props.anchor}
         <div
-          className="pointer-events-none absolute right-0 top-full z-[999] mt-2 hidden rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block"
+          className={cn(
+            "pointer-events-none absolute top-full z-[999] mt-2 hidden rounded-xl border border-zinc-200 bg-white p-3 text-[11px] text-zinc-700 shadow-xl group-hover:block",
+            alignClass
+          )}
           style={{ width: props.width ?? 360 }}
         >
           {props.children}
@@ -294,12 +368,13 @@ export default function Home() {
   const [favorites, setFavorites] = useState<number[]>([])
   const [onlyFavorites, setOnlyFavorites] = useState(false)
 
-  const [filtersOpen, setFiltersOpen] = useState(true)
+  // C: default closed
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
-  // New: Beds/Baths/Type filters
-  const [bedsMin, setBedsMin] = useState<number>(0) // 0 = any
-  const [bathsMin, setBathsMin] = useState<number>(0) // 0 = any
+  // Beds/Baths/Type filters
+  const [bedsMin, setBedsMin] = useState<number>(0)
+  const [bathsMin, setBathsMin] = useState<number>(0)
   const [types, setTypes] = useState<Record<ListingType, boolean>>({
     House: true,
     Condo: true,
@@ -321,7 +396,7 @@ export default function Home() {
     const rents = LISTINGS.map((l) => l.rentEstimate)
     const hoas = LISTINGS.map((l) => l.hoaMonthly ?? 0)
 
-    const mortgages = LISTINGS.map((l) => {
+    const payments = LISTINGS.map((l) => {
       const s: Scenario = {
         ...scenario,
         hoaMonthly: (l.hoaMonthly ?? 0) + scenario.hoaMonthly,
@@ -329,8 +404,8 @@ export default function Home() {
         insuranceMonthly: estimateInsuranceMonthly(l),
       }
       const u = underwriting({ price: l.price, rentMonthly: l.rentEstimate, scenario: s })
-      // “Mortgage” slider here means “All-in payment” (P&I + tax + ins + HOA) for filtering
-      return u.mortgage + u.taxesMonthly + u.insuranceMonthly + u.hoaMonthly
+      const allInPayment = u.mortgage + u.taxesMonthly + u.insuranceMonthly + u.hoaMonthly
+      return allInPayment
     })
 
     const min = (arr: number[]) => Math.min(...arr)
@@ -343,12 +418,11 @@ export default function Home() {
       rentMax: max(rents),
       hoaMin: min(hoas),
       hoaMax: max(hoas),
-      paymentMin: min(mortgages),
-      paymentMax: max(mortgages),
+      paymentMin: min(payments),
+      paymentMax: max(payments),
     }
   }, [scenario])
 
-  // Range state
   const [priceMin, setPriceMin] = useState(0)
   const [priceMax, setPriceMax] = useState(0)
   const [rentMin, setRentMin] = useState(0)
@@ -430,20 +504,40 @@ export default function Home() {
 
       const u = underwriting({ price: l.price, rentMonthly: l.rentEstimate, scenario: s })
 
-      // “Payment” = mortgage (P&I) + tax + insurance + HOA (NO vacancy/management/maintenance)
-      const allInPayment = u.mortgage + u.taxesMonthly + u.insuranceMonthly + u.hoaMonthly
+      const mortgagePI = u.mortgage
+      const taxes = u.taxesMonthly
+      const insurance = u.insuranceMonthly
+      const hoa = u.hoaMonthly
+
+      const piti = mortgagePI + taxes + insurance
+      const allInPayment = piti + hoa
+
       const rentMinusPayment = l.rentEstimate - allInPayment
 
-      // Cash flow already includes vacancy/management/maintenance (reserves)
-      return { listing: l, u, allInPayment, rentMinusPayment, estTaxRatePct, estInsuranceMonthly }
+      const condition = inferConditionTag(l)
+
+      return {
+        listing: l,
+        u,
+        estTaxRatePct,
+        estInsuranceMonthly,
+        mortgagePI,
+        taxes,
+        insurance,
+        hoa,
+        piti,
+        allInPayment,
+        rentMinusPayment,
+        condition,
+      }
     })
 
     const filtered = computed.filter(({ listing, u, allInPayment }) => {
       const priceOk = listing.price >= priceMin && listing.price <= priceMax
       const rentOk = listing.rentEstimate >= rentMin && listing.rentEstimate <= rentMax
 
-      const hoa = listing.hoaMonthly ?? 0
-      const hoaOk = hoa >= hoaMin && hoa <= hoaMax
+      const hoaValue = listing.hoaMonthly ?? 0
+      const hoaOk = hoaValue >= hoaMin && hoaValue <= hoaMax
 
       const paymentOk = allInPayment >= paymentMin && allInPayment <= paymentMax
       const cashFlowOk = minCashFlow ? u.cashFlow >= minCashFlow : true
@@ -633,10 +727,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Sticky controls (solid backdrop + divider so you can't see listings behind) */}
+        {/* Sticky controls */}
         <div className="sticky top-0 z-40 mt-6">
           <div className="rounded-xl border border-emerald-100 bg-white/95 backdrop-blur shadow-sm">
-            {/* Results + chips */}
             <div className="p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -672,7 +765,6 @@ export default function Home() {
 
             <div className="border-t border-zinc-100" />
 
-            {/* Filters + Assumptions */}
             <div className="grid gap-4 p-3 lg:grid-cols-12">
               {/* Filters */}
               <div className="lg:col-span-8">
@@ -688,32 +780,6 @@ export default function Home() {
 
                   {filtersOpen && (
                     <div className="border-t border-zinc-100 p-4">
-                      <div className="flex items-center justify-between pb-3">
-                        <div className="text-xs font-semibold text-zinc-700">Quick filters</div>
-                        <button
-                          onClick={() => {
-                            setPriceMin(stats.priceMin)
-                            setPriceMax(stats.priceMax)
-                            setRentMin(stats.rentMin)
-                            setRentMax(stats.rentMax)
-                            setHoaMin(stats.hoaMin)
-                            setHoaMax(stats.hoaMax)
-                            setPaymentMin(stats.paymentMin)
-                            setPaymentMax(stats.paymentMax)
-                            setBedsMin(0)
-                            setBathsMin(0)
-                            setTypes({ House: true, Condo: true, Townhome: true })
-                            setMinCashFlow(0)
-                            setOnlyFavorites(false)
-                          }}
-                          className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
-                          type="button"
-                        >
-                          Reset filters
-                        </button>
-                      </div>
-
-                      {/* Beds / Baths / Type */}
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div className="space-y-1">
                           <div className="text-xs font-medium text-zinc-600">Beds</div>
@@ -898,43 +964,7 @@ export default function Home() {
                             }
                           />
 
-                          <div className="text-[11px] text-zinc-500">
-                            Tax + insurance are estimated per listing (demo heuristic).
-                          </div>
-                        </div>
-
-                        <div className="border-t border-zinc-100 pt-4">
-                          <div className="text-xs font-semibold text-zinc-600">Operating reserves</div>
-
-                          <div className="mt-3 space-y-4">
-                            <SliderRow
-                              label="Vacancy"
-                              valueLabel={`${Math.round(scenario.vacancyPct * 100)}%`}
-                              min={0}
-                              max={15}
-                              step={1}
-                              value={Math.round(scenario.vacancyPct * 100)}
-                              onChange={(v) => setScenario({ ...scenario, vacancyPct: v / 100 })}
-                            />
-                            <SliderRow
-                              label="Management"
-                              valueLabel={`${Math.round(scenario.managementPct * 100)}%`}
-                              min={0}
-                              max={15}
-                              step={1}
-                              value={Math.round(scenario.managementPct * 100)}
-                              onChange={(v) => setScenario({ ...scenario, managementPct: v / 100 })}
-                            />
-                            <SliderRow
-                              label="Maintenance"
-                              valueLabel={`${Math.round(scenario.maintenancePct * 100)}%`}
-                              min={0}
-                              max={20}
-                              step={1}
-                              value={Math.round(scenario.maintenancePct * 100)}
-                              onChange={(v) => setScenario({ ...scenario, maintenancePct: v / 100 })}
-                            />
-                          </div>
+                          <div className="text-[11px] text-zinc-500">Tax + insurance are estimated per listing (demo heuristic).</div>
                         </div>
                       </div>
                     </div>
@@ -943,7 +973,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Bottom divider like Realtor */}
             <div className="border-t border-zinc-200" />
           </div>
         </div>
@@ -952,7 +981,7 @@ export default function Home() {
         <div className="mt-6">
           {viewMode === "list" ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {rows.map(({ listing, u, allInPayment, rentMinusPayment, estInsuranceMonthly, estTaxRatePct }) => {
+              {rows.map(({ listing, u, mortgagePI, taxes, insurance, hoa, piti, allInPayment, rentMinusPayment, condition }) => {
                 const isSaved = favorites.includes(listing.id)
                 const cashFlowColor = u.cashFlow >= 0 ? "text-emerald-700" : "text-rose-600"
                 const deltaColor = rentMinusPayment >= 0 ? "text-emerald-700" : "text-rose-600"
@@ -966,6 +995,11 @@ export default function Home() {
                       {/* Image */}
                       <div className="relative h-56 w-full overflow-hidden rounded-t-xl">
                         <img src={listing.images[0]} alt="Listing" className="h-full w-full object-cover" />
+
+                        {/* Condition badge */}
+                        <div className="absolute left-3 top-3">
+                          <ConditionBadge tag={condition.tag} reason={condition.reason} />
+                        </div>
 
                         {/* Save */}
                         <button
@@ -999,9 +1033,10 @@ export default function Home() {
                             </div>
                           </div>
 
-                          {/* Cash flow hover (NOT clipped) */}
+                          {/* B: Single cash-flow card with hover */}
                           <HoverCard
-                            width={360}
+                            width={380}
+                            align="right"
                             anchor={
                               <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-right shadow-sm">
                                 <div className="text-xs text-zinc-600">Est cash flow</div>
@@ -1015,19 +1050,19 @@ export default function Home() {
                               <div className="text-right font-semibold">{fmtMoney(listing.rentEstimate)}</div>
 
                               <div>Mortgage (P&I)</div>
-                              <div className="text-right font-semibold">{fmtMoney(u.mortgage)}</div>
+                              <div className="text-right font-semibold">{fmtMoney(mortgagePI)}</div>
 
                               <div>Taxes (est)</div>
-                              <div className="text-right font-semibold">
-                                {fmtMoney(u.taxesMonthly)}{" "}
-                                <span className="text-[10px] text-zinc-500">({estTaxRatePct.toFixed(2)}%)</span>
-                              </div>
+                              <div className="text-right font-semibold">{fmtMoney(taxes)}</div>
 
                               <div>Insurance (est)</div>
-                              <div className="text-right font-semibold">{fmtMoney(estInsuranceMonthly)}</div>
+                              <div className="text-right font-semibold">{fmtMoney(insurance)}</div>
 
                               <div>HOA</div>
-                              <div className="text-right font-semibold">{fmtMoney(u.hoaMonthly)}</div>
+                              <div className="text-right font-semibold">{fmtMoney(hoa)}</div>
+
+                              <div className="text-zinc-500">Operating reserves</div>
+                              <div />
 
                               <div>Vacancy</div>
                               <div className="text-right font-semibold">{fmtMoney(u.vacancy)}</div>
@@ -1043,21 +1078,54 @@ export default function Home() {
                               <div className="text-xs font-semibold text-zinc-900">Cash flow</div>
                               <div className={cn("text-xs font-bold", cashFlowColor)}>{fmtMoney(u.cashFlow)}/mo</div>
                             </div>
-                            <div className="mt-1 text-[10px] text-zinc-500">
-                              Payment includes P&I + tax + insurance + HOA. Cash flow also includes operating reserves.
-                            </div>
                           </HoverCard>
                         </div>
 
                         <div className="mt-3 text-sm text-zinc-600 line-clamp-3">{listing.description}</div>
 
-                        {/* Investor metrics */}
+                        {/* Deltas / primary metrics */}
                         <div className="mt-4 grid grid-cols-2 gap-3">
-                          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                            <div className="text-xs text-zinc-600">Rent − Payment</div>
-                            <div className={cn("mt-1 text-lg font-extrabold", deltaColor)}>{fmtMoney(rentMinusPayment)}/mo</div>
-                            <div className="mt-1 text-[11px] text-zinc-500">Rent minus PITI + HOA</div>
-                          </div>
+                          {/* E: Rent - Payment hover */}
+                          <HoverCard
+                            width={380}
+                            align="left"
+                            anchor={
+                              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                                <div className="text-xs text-zinc-600">Rent − Payment</div>
+                                <div className={cn("mt-1 text-lg font-extrabold", deltaColor)}>{fmtMoney(rentMinusPayment)}/mo</div>
+                                <div className="mt-1 text-[11px] text-zinc-500">Rent minus PITI + HOA</div>
+                              </div>
+                            }
+                          >
+                            <div className="text-xs font-semibold text-zinc-900">Rent − Payment breakdown</div>
+                            <div className="mt-2 grid grid-cols-2 gap-y-1">
+                              <div>Rent</div>
+                              <div className="text-right font-semibold">{fmtMoney(listing.rentEstimate)}</div>
+
+                              <div>Mortgage (P&I)</div>
+                              <div className="text-right font-semibold">{fmtMoney(mortgagePI)}</div>
+
+                              <div>Taxes (est)</div>
+                              <div className="text-right font-semibold">{fmtMoney(taxes)}</div>
+
+                              <div>Insurance (est)</div>
+                              <div className="text-right font-semibold">{fmtMoney(insurance)}</div>
+
+                              <div className="text-zinc-700 font-semibold">PITI</div>
+                              <div className="text-right font-semibold">{fmtMoney(piti)}</div>
+
+                              <div>HOA</div>
+                              <div className="text-right font-semibold">{fmtMoney(hoa)}</div>
+
+                              <div className="text-zinc-700 font-semibold">All-in payment</div>
+                              <div className="text-right font-semibold">{fmtMoney(allInPayment)}</div>
+                            </div>
+
+                            <div className="mt-2 border-t pt-2 flex items-center justify-between">
+                              <div className="text-xs font-semibold text-zinc-900">Rent − Payment</div>
+                              <div className={cn("text-xs font-bold", deltaColor)}>{fmtMoney(rentMinusPayment)}/mo</div>
+                            </div>
+                          </HoverCard>
 
                           <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
                             <div className="text-xs text-zinc-600">Est cash flow</div>
@@ -1072,7 +1140,7 @@ export default function Home() {
                             <div className="font-semibold">{fmtMoney(listing.rentEstimate)}</div>
                           </div>
                           <div className="rounded-md border border-zinc-200 bg-white px-2.5 py-2">
-                            <div className="text-[11px] text-zinc-500">Est payment</div>
+                            <div className="text-[11px] text-zinc-500">All-in payment</div>
                             <div className="font-semibold">{fmtMoney(allInPayment)}</div>
                           </div>
                           <div className="rounded-md border border-zinc-200 bg-white px-2.5 py-2">
@@ -1163,35 +1231,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-/** SliderRow */
-function SliderRow(props: {
-  label: string
-  valueLabel: string
-  min: number
-  max: number
-  step: number
-  value: number
-  onChange: (v: number) => void
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-zinc-800">{props.label}</div>
-        <div className="text-sm text-zinc-600">{props.valueLabel}</div>
-      </div>
-      <input
-        type="range"
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={props.value}
-        onChange={(e) => props.onChange(Number(e.target.value))}
-        className="w-full accent-emerald-700"
-      />
     </div>
   )
 }
