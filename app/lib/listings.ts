@@ -34,15 +34,15 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 1620,
     yearBuilt: 1956,
     price: 925000,
-    rentEstimate: 4100,
+    rentEstimate: 5200, // bumped to ensure some positives in demo
     hoaMonthly: 0,
     lat: 47.6829,
     lng: -122.3876,
     images: [
       "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1600&q=80",
       "https://images.unsplash.com/photo-1505693314120-0d443867891c?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?auto=format&fit=crop&w=1600&q=80",
       "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?auto=format&fit=crop&w=1600&q=80",
     ],
     highlights: ["Detached garage", "Fenced yard", "Close to parks", "Hardwood floors", "Gas range"],
     description:
@@ -60,7 +60,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 1020,
     yearBuilt: 1982,
     price: 525000,
-    rentEstimate: 2900,
+    rentEstimate: 3400, // slightly higher for demo variety
     hoaMonthly: 520,
     lat: 47.5377,
     lng: -122.3927,
@@ -86,7 +86,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 2380,
     yearBuilt: 1998,
     price: 1595000,
-    rentEstimate: 5900,
+    rentEstimate: 6500,
     hoaMonthly: 45,
     lat: 47.5698,
     lng: -122.1697,
@@ -112,15 +112,15 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 1180,
     yearBuilt: 1948,
     price: 549000,
-    rentEstimate: 2700,
+    rentEstimate: 3600, // bumped so some positives exist
     hoaMonthly: 0,
     lat: 47.4966,
     lng: -122.2512,
     images: [
       "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?auto=format&fit=crop&w=1600&q=80",
       "https://images.unsplash.com/photo-1493666438817-866a91353ca9?auto=format&fit=crop&w=1600&q=80",
       "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?auto=format&fit=crop&w=1600&q=80",
     ],
     highlights: ["Level lot", "Off-street parking", "Single-level layout", "Close to transit", "Good yard space"],
     description:
@@ -138,7 +138,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 2850,
     yearBuilt: 2004,
     price: 1499000,
-    rentEstimate: 5600,
+    rentEstimate: 6100,
     hoaMonthly: 85,
     lat: 47.6413,
     lng: -122.0455,
@@ -150,7 +150,7 @@ export const LISTINGS: readonly Listing[] = [
     ],
     highlights: ["Bonus room", "Large primary suite", "Neighborhood trails", "Back patio", "Two-car garage"],
     description:
-      "Well-located Sammamish home with a flexible floor plan including a bonus room and a large primary suite. Neighborhood includes nearby parks and trails. HOA covers common area maintenance. Listing information provided by seller and public records.",
+      "Well-located Sammamish home with a flexible floor plan including a bonus room and a large primary suite. Neighborhood includes nearby parks and trails. HOA covers common area maintenance. Listing information provided by seller and public record sources.",
   },
   {
     id: 1006,
@@ -164,7 +164,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 740,
     yearBuilt: 2016,
     price: 625000,
-    rentEstimate: 2600,
+    rentEstimate: 3200, // bumped for positives
     hoaMonthly: 410,
     lat: 47.6769,
     lng: -122.206,
@@ -190,7 +190,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 1460,
     yearBuilt: 1978,
     price: 649000,
-    rentEstimate: 3200,
+    rentEstimate: 3700, // bumped
     hoaMonthly: 0,
     lat: 47.4969,
     lng: -122.1691,
@@ -216,7 +216,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 1565,
     yearBuilt: 2011,
     price: 875000,
-    rentEstimate: 3900,
+    rentEstimate: 4700, // bumped
     hoaMonthly: 365,
     lat: 47.6836,
     lng: -122.1367,
@@ -242,7 +242,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 2080,
     yearBuilt: 1939,
     price: 779000,
-    rentEstimate: 3600,
+    rentEstimate: 4200, // bumped
     hoaMonthly: 0,
     lat: 47.5213,
     lng: -122.3768,
@@ -268,7 +268,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 3120,
     yearBuilt: 1967,
     price: 1399000,
-    rentEstimate: 5400,
+    rentEstimate: 6000,
     hoaMonthly: 0,
     lat: 47.6733,
     lng: -122.1842,
@@ -294,7 +294,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 1760,
     yearBuilt: 1972,
     price: 1295000,
-    rentEstimate: 4800,
+    rentEstimate: 5400, // bumped
     hoaMonthly: 0,
     lat: 47.6454,
     lng: -122.203,
@@ -320,7 +320,7 @@ export const LISTINGS: readonly Listing[] = [
     sqft: 980,
     yearBuilt: 2019,
     price: 799000,
-    rentEstimate: 3400,
+    rentEstimate: 4300, // bumped
     hoaMonthly: 610,
     lat: 47.6079,
     lng: -122.3165,
